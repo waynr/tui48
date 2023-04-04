@@ -8,7 +8,7 @@ use crossterm::{
     terminal,
 };
 
-/// The Result type for autorandr.
+/// The Result type for mastermind.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
