@@ -16,16 +16,16 @@ enum Color {
     Red,
     Green,
     Blue,
-    Purple,
+    Yellow,
 }
 
 impl fmt::Display for Color {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let c = match self {
-            Color::Red => 'r',
-            Color::Green => 'g',
-            Color::Blue => 'b',
-            Color::Purple => 'p',
+            Color::Red => "r".red(),
+            Color::Green => "g".green(),
+            Color::Blue => "b".blue(),
+            Color::Yellow => "y".yellow(),
         };
         write!(f, "{}", c)
     }
@@ -93,9 +93,9 @@ impl TryFrom<String> for Code {
                     set.insert(Color::Blue);
                     Some(Color::Blue)
                 }
-                'p' => {
-                    set.insert(Color::Purple);
-                    Some(Color::Purple)
+                'y' => {
+                    set.insert(Color::Yellow);
+                    Some(Color::Yellow)
                 }
                 _ => None,
             })
@@ -147,7 +147,15 @@ impl Board {
 
     fn init() -> Result<Self> {
         let mut buffer = String::new();
-        print!("please input hidden code: ");
+        println!(" to begin you will need to input hidden code.");
+        println!(
+            " codes can be one of four letters:\n {} {} {} {}",
+            "r".red(),
+            "g".green(),
+            "b".blue(),
+            "y".yellow()
+        );
+        print!("hidden code: ");
         std::io::stdout().flush()?;
 
         terminal::enable_raw_mode()?;
@@ -164,7 +172,17 @@ impl Board {
         }
         terminal::disable_raw_mode()?;
 
-        println!("thanks!");
+        println!("\n great.\n");
+        println!(
+            r#"score is represented with three different colors:\n
+ correct color, correct position: {}
+ correct color, wrong position: {}
+ wrong color, wrong position: {}
+ good luck!"#,
+            " ".on_cyan(),
+            " ".on_white(),
+            " ".on_red(),
+        );
 
         Ok(Self {
             hidden_code: buffer.try_into()?,
@@ -199,9 +217,9 @@ enum ScoreDetail {
 impl fmt::Display for ScoreDetail {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let c = match self {
-            ScoreDetail::ColorCorrect => 'w',
-            ScoreDetail::ColorAndPositionCorrect => 'b',
-            ScoreDetail::Empty => '_',
+            ScoreDetail::ColorCorrect => " ".on_white(),
+            ScoreDetail::ColorAndPositionCorrect => " ".on_cyan(),
+            ScoreDetail::Empty => " ".on_red(),
         };
         write!(f, "{}", c)
     }
