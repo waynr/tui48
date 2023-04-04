@@ -2,18 +2,14 @@ use std::collections::HashSet;
 use std::fmt;
 use std::io::Write;
 
-use clap::Parser;
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEvent},
+    style::Stylize,
+    terminal,
+};
 
 /// The Result type for autorandr.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    /// The hidden code for this iteration of the game.
-    #[arg(long, value_name = "HIDDEN_CODE")]
-    hidden_code: String,
-}
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 enum Color {
@@ -43,17 +39,17 @@ struct Code {
 
 impl Code {
     fn score(&self, other: Code) -> Score {
-        let score: Vec<Key> = self
+        let score: Vec<ScoreDetail> = self
             .positional
             .iter()
             .zip(other.positional.iter())
             .map(|(s, o)| {
                 if s == o {
-                    Key::ColorAndPositionCorrect
+                    ScoreDetail::ColorAndPositionCorrect
                 } else if self.set.contains(o) {
-                    Key::ColorCorrect
+                    ScoreDetail::ColorCorrect
                 } else {
-                    Key::Empty
+                    ScoreDetail::Empty
                 }
             })
             .collect();
@@ -148,6 +144,33 @@ impl Board {
             None => Ok(false),
         }
     }
+
+    fn init() -> Result<Self> {
+        let mut buffer = String::new();
+        print!("please input hidden code: ");
+        std::io::stdout().flush()?;
+
+        terminal::enable_raw_mode()?;
+        while let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            match code {
+                KeyCode::Enter => {
+                    break;
+                }
+                KeyCode::Char(c) => {
+                    buffer.push(c);
+                }
+                _ => {}
+            }
+        }
+        terminal::disable_raw_mode()?;
+
+        println!("thanks!");
+
+        Ok(Self {
+            hidden_code: buffer.try_into()?,
+            rounds: Vec::new(),
+        })
+    }
 }
 
 impl fmt::Display for Board {
@@ -157,41 +180,43 @@ impl fmt::Display for Board {
             let s = format!("| {} |", round);
             lines.push(s);
         }
-        write!(f, "{}\n", "=".repeat(21))?;
-        write!(f, "{}\n", lines.join("\n"))?;
-        write!(f, "{}\n", "=".repeat(21))?;
+        if self.rounds.len() > 0 {
+            write!(f, "\n{}\n", "=".repeat(21))?;
+            write!(f, "{}\n", lines.join("\n"))?;
+            write!(f, "{}\n", "=".repeat(21))?;
+        }
         Ok(())
     }
 }
 
 #[derive(Clone)]
-enum Key {
+enum ScoreDetail {
     ColorCorrect,
     ColorAndPositionCorrect,
     Empty,
 }
 
-impl fmt::Display for Key {
+impl fmt::Display for ScoreDetail {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let c = match self {
-            Key::ColorCorrect => 'w',
-            Key::ColorAndPositionCorrect => 'b',
-            Key::Empty => '_',
+            ScoreDetail::ColorCorrect => 'w',
+            ScoreDetail::ColorAndPositionCorrect => 'b',
+            ScoreDetail::Empty => '_',
         };
         write!(f, "{}", c)
     }
 }
 
-struct Score(Key, Key, Key, Key);
+struct Score(ScoreDetail, ScoreDetail, ScoreDetail, ScoreDetail);
 
 impl Score {
     fn wins(&self) -> bool {
         match self {
             Score(
-                Key::ColorAndPositionCorrect,
-                Key::ColorAndPositionCorrect,
-                Key::ColorAndPositionCorrect,
-                Key::ColorAndPositionCorrect,
+                ScoreDetail::ColorAndPositionCorrect,
+                ScoreDetail::ColorAndPositionCorrect,
+                ScoreDetail::ColorAndPositionCorrect,
+                ScoreDetail::ColorAndPositionCorrect,
             ) => true,
             _ => false,
         }
@@ -222,12 +247,7 @@ impl fmt::Display for Round {
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
-
-    let mut board = Board {
-        hidden_code: cli.hidden_code.try_into()?,
-        rounds: Vec::new(),
-    };
+    let mut board = Board::init()?;
 
     loop {
         if board.get_input()? {
