@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt;
+use std::io::Write;
 
 use clap::Parser;
 
@@ -129,7 +130,11 @@ impl Board {
     fn get_input(&mut self) -> Result<bool> {
         println!("{}", &self);
         let mut buffer = String::new();
+
+        print!("guess: ");
+        std::io::stdout().flush()?;
         std::io::stdin().read_line(&mut buffer)?;
+
         let code: Code = buffer.try_into()?;
         let round = Round {
             input_code: code.clone(),
@@ -147,9 +152,14 @@ impl Board {
 
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut lines = Vec::new();
         for round in &self.rounds {
-            write!(f, "{}", round)?;
+            let s = format!("| {} |", round);
+            lines.push(s);
         }
+        write!(f, "{}\n", "=".repeat(21))?;
+        write!(f, "{}\n", lines.join("\n"))?;
+        write!(f, "{}\n", "=".repeat(21))?;
         Ok(())
     }
 }
@@ -166,7 +176,7 @@ impl fmt::Display for Key {
         let c = match self {
             Key::ColorCorrect => 'w',
             Key::ColorAndPositionCorrect => 'b',
-            Key::Empty => ' ',
+            Key::Empty => '_',
         };
         write!(f, "{}", c)
     }
@@ -207,7 +217,7 @@ impl Round {
 
 impl fmt::Display for Round {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} - {}", self.input_code, self.score)
+        write!(f, "{} | {}", self.input_code, self.score)
     }
 }
 
