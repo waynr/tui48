@@ -1,5 +1,5 @@
 [package]
-name = "mastermind"
+name = "tui48"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 
 crossterm = "0.26"
+rand = "0.8.5"

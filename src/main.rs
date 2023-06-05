@@ -1,278 +1,113 @@
-use std::collections::HashSet;
-use std::fmt;
-use std::io::Write;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
-    style::Stylize,
     terminal,
 };
+
+use rand::{thread_rng, Rng};
+use rand::rngs::ThreadRng;
 
 /// The Result type for mastermind.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-enum Color {
-    Red,
-    Green,
-    Blue,
-    Yellow,
-}
-
-impl fmt::Display for Color {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let c = match self {
-            Color::Red => "r".red(),
-            Color::Green => "g".green(),
-            Color::Blue => "b".blue(),
-            Color::Yellow => "y".yellow(),
-        };
-        write!(f, "{}", c)
-    }
-}
-
-#[derive(Clone)]
-struct Code {
-    positional: [Color; 4],
-    set: HashSet<Color>,
-}
-
-impl Code {
-    fn score(&self, other: Code) -> Score {
-        let score: Vec<ScoreDetail> = self
-            .positional
-            .iter()
-            .zip(other.positional.iter())
-            .map(|(s, o)| {
-                if s == o {
-                    ScoreDetail::ColorAndPositionCorrect
-                } else if self.set.contains(o) {
-                    ScoreDetail::ColorCorrect
-                } else {
-                    ScoreDetail::Empty
-                }
-            })
-            .collect();
-        Score(
-            score[0].clone(),
-            score[1].clone(),
-            score[2].clone(),
-            score[3].clone(),
-        )
-    }
-}
-
-impl fmt::Display for Code {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} {} {} {}",
-            self.positional[0], self.positional[1], self.positional[2], self.positional[3]
-        )
-    }
-}
-
-impl TryFrom<String> for Code {
-    type Error = Box<dyn std::error::Error>;
-
-    fn try_from(s: String) -> Result<Self> {
-        let mut set = HashSet::new();
-        let pos: Vec<Color> = s
-            .chars()
-            .filter_map(|c| match c {
-                '(' | ')' | ',' => None,
-                'r' => {
-                    set.insert(Color::Red);
-                    Some(Color::Red)
-                }
-                'g' => {
-                    set.insert(Color::Green);
-                    Some(Color::Green)
-                }
-                'b' => {
-                    set.insert(Color::Blue);
-                    Some(Color::Blue)
-                }
-                'y' => {
-                    set.insert(Color::Yellow);
-                    Some(Color::Yellow)
-                }
-                _ => None,
-            })
-            .collect();
-        match pos.len() {
-            x if x < 4 => return Err(String::from("not enough characters").into()),
-            x if x > 4 => return Err(String::from("too many characters").into()),
-            _ => (),
-        }
-        Ok(Self {
-            positional: [
-                pos[0].clone(),
-                pos[1].clone(),
-                pos[2].clone(),
-                pos[3].clone(),
-            ],
-            set,
-        })
-    }
-}
-
+#[derive(Default)]
 struct Board {
-    hidden_code: Code,
-    rounds: Vec<Round>,
+    rng: ThreadRng,
+    basket: ValueBasket,
+    slots: [[Slot;4] ;4]
 }
 
 impl Board {
-    fn get_input(&mut self) -> Result<bool> {
-        println!("{}", &self);
-        let mut buffer = String::new();
-
-        print!("guess: ");
-        std::io::stdout().flush()?;
-        std::io::stdin().read_line(&mut buffer)?;
-
-        let code: Code = buffer.try_into()?;
-        let round = Round {
-            input_code: code.clone(),
-            score: self.hidden_code.score(code),
-        };
-
-        self.rounds.push(round);
-
-        match self.rounds.last() {
-            Some(rs) => Ok(rs.wins()),
-            None => Ok(false),
-        }
-    }
-
-    fn init() -> Result<Self> {
-        let mut buffer = String::new();
-        println!(" to begin you will need to input hidden code.");
-        println!(
-            " codes can be one of four letters:\n {} {} {} {}",
-            "r".red(),
-            "g".green(),
-            "b".blue(),
-            "y".yellow()
-        );
-        print!("hidden code: ");
-        std::io::stdout().flush()?;
-
-        terminal::enable_raw_mode()?;
-        while let Event::Key(KeyEvent { code, .. }) = event::read()? {
-            match code {
-                KeyCode::Enter => {
-                    break;
-                }
-                KeyCode::Char(c) => {
-                    buffer.push(c);
-                }
-                _ => {}
+    fn new(mut rng: ThreadRng) -> Self {
+        let (xdx2, ydx2) = (0, 0);
+        let (xdx1, ydx1) = (rng.gen_range(0..3), rng.gen_range(0..3));
+        loop {
+            let (xdx2, ydx2) = (rng.gen_range(0..3), rng.gen_range(0..3));
+            if (xdx1, ydx1) == (xdx2, ydx2) {
+                continue;
             }
+            break;
         }
-        terminal::disable_raw_mode()?;
-
-        println!("\n great.\n");
-        println!(
-            r#"score is represented with three different colors:\n
- correct color, correct position: {}
- correct color, wrong position: {}
- wrong color, wrong position: {}
- good luck!"#,
-            " ".on_cyan(),
-            " ".on_white(),
-            " ".on_red(),
-        );
-
-        Ok(Self {
-            hidden_code: buffer.try_into()?,
-            rounds: Vec::new(),
-        })
-    }
-}
-
-impl fmt::Display for Board {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut lines = Vec::new();
-        for round in &self.rounds {
-            let s = format!("| {} |", round);
-            lines.push(s);
-        }
-        if self.rounds.len() > 0 {
-            write!(f, "\n{}\n", "=".repeat(21))?;
-            write!(f, "{}\n", lines.join("\n"))?;
-            write!(f, "{}\n", "=".repeat(21))?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-enum ScoreDetail {
-    ColorCorrect,
-    ColorAndPositionCorrect,
-    Empty,
-}
-
-impl fmt::Display for ScoreDetail {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let c = match self {
-            ScoreDetail::ColorCorrect => " ".on_white(),
-            ScoreDetail::ColorAndPositionCorrect => " ".on_cyan(),
-            ScoreDetail::Empty => " ".on_red(),
+        let mut b = Self {
+            rng,
+            basket: ValueBasket::default(),
+            slots: [
+                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
+                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
+                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
+                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
+            ],
         };
-        write!(f, "{}", c)
+        b.slots[ydx1][xdx1].set(b.basket.get());
+        b.slots[ydx2][xdx2].set(b.basket.get());
+        b
     }
 }
 
-struct Score(ScoreDetail, ScoreDetail, ScoreDetail, ScoreDetail);
+#[derive(Default)]
+struct Slot {
+    value: Option<Rc<RefCell<Value>>>,
+}
 
-impl Score {
-    fn wins(&self) -> bool {
-        match self {
-            Score(
-                ScoreDetail::ColorAndPositionCorrect,
-                ScoreDetail::ColorAndPositionCorrect,
-                ScoreDetail::ColorAndPositionCorrect,
-                ScoreDetail::ColorAndPositionCorrect,
-            ) => true,
-            _ => false,
+impl Slot {
+    fn set(&mut self, value: Rc<RefCell<Value>>) {
+        self.value = Some(value)
+    }
+
+    fn unset(&mut self) {
+        self.value = None
+    }
+}
+
+struct Value(u16);
+
+impl Default for Value {
+    fn default() -> Self {
+        Value(2)
+    }
+}
+
+#[derive(Default)]
+struct ValueBasket {
+    values: [Rc<RefCell<Value>>; 25],
+}
+
+impl ValueBasket {
+    fn get(&self) -> Rc<RefCell<Value>> {
+        let v = self.values
+            .iter()
+            .find(|item| Rc::<_>::strong_count(item) == 1)
+            .expect("something is wrong if we can't find a value here!")
+            .clone();
+        if v.borrow().0 != 2 {
+            let mut mutv = v.borrow_mut();
+            mutv.0 = 2;
         }
-    }
-}
-
-impl fmt::Display for Score {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} {} {}", self.0, self.1, self.2, self.3)
-    }
-}
-
-struct Round {
-    input_code: Code,
-    score: Score,
-}
-
-impl Round {
-    fn wins(&self) -> bool {
-        self.score.wins()
-    }
-}
-
-impl fmt::Display for Round {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} | {}", self.input_code, self.score)
+        v
     }
 }
 
 fn main() -> Result<()> {
-    let mut board = Board::init()?;
+    let mut board = Board::default();
+    let value_buf = ValueBasket::default();
 
-    loop {
-        if board.get_input()? {
-            println!("{}", board);
-            println!("congratulations, you win!");
-            break;
+    board.slots[0][0].set(value_buf.get());
+
+    terminal::enable_raw_mode()?;
+    while let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        match code {
+            KeyCode::Enter => {
+                break;
+            }
+            KeyCode::Char(c) => {
+                break;
+            }
+            _ => {}
         }
     }
+    terminal::disable_raw_mode()?;
+
     return Ok(());
 }
