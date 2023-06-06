@@ -4,10 +4,11 @@ use crossterm::{
 };
 use rand::thread_rng;
 
-mod error;
-use error::Result;
-
 mod board;
+mod round;
+mod error;
+
+use error::Result;
 use board::Board;
 
 fn main() -> Result<()> {
