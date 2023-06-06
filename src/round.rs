@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rand::Rng;
 use rand::rngs::ThreadRng;
+use rand::Rng;
 
 use crate::board::Direction;
 
@@ -37,6 +37,7 @@ pub(crate) struct Round {
     score: u16,
 }
 
+// public methods
 impl Round {
     pub(crate) fn score(&self) -> u16 {
         self.score
@@ -57,14 +58,12 @@ impl Round {
         r.slots[ydx2][xdx2] = 2;
         r
     }
+}
 
+// private methods
+impl Round {
     fn iter_mut(round: Rc<RefCell<Round>>, direction: Direction) -> RoundIterator {
-        RoundIterator {
-            round,
-            direction,
-            xdx: 0,
-            ydx: 0,
-        }
+        RoundIterator::new(round, direction)
     }
 
     fn get(&self, idx: &Idx) -> u16 {
@@ -88,9 +87,7 @@ impl Round {
         let rf = self.get_mut(idx);
         *rf = value;
     }
-}
 
-impl Round {
     pub fn shift(round: Rc<RefCell<Self>>, direction: Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::default();
         let idxs = Round::iter_mut(round.clone(), direction).collect::<Vec<Idx>>();
@@ -110,25 +107,24 @@ impl Round {
                     }
                     continue;
                 }
-                // if the pivot element is 0 and the cmp isn't, replace the pivot element with
-                // the cmp and zero the cmp
+                // if the pivot element is 0 and the cmp isn't, replace the pivot element with the
+                // cmp and zero the cmp
                 if pivot == 0 {
                     round.set(pivot_idx, cmp);
                     round.set(cmp_idx, 0);
                     hint.set(cmp_idx, pivot_idx.clone());
                     continue;
                 }
-                // if the pivot element and the cmp element are equal then they must be
-                // combined; do so and increment the score by the value of the eliminated
-                // element
+                // if the pivot element and the cmp element are equal then they must be combined;
+                // do so and increment the score by the value of the eliminated element
                 if pivot == cmp {
                     round.score += cmp;
                     round.set(pivot_idx, pivot + cmp);
                     round.set(cmp_idx, 0);
                     hint.set(cmp_idx, pivot_idx.clone());
                 }
-                // at this point we can consider the current cmp element to be the new pivot
-                // for subsequent iterations
+                // at this point we can consider the current cmp element to be the new pivot for
+                // subsequent iterations
                 pivot_idx = cmp_idx;
             }
         }
@@ -141,24 +137,31 @@ impl Round {
 }
 
 struct RoundIterator {
-    round: Rc<RefCell<Round>>,
     direction: Direction,
+    max_xdx: usize,
+    max_ydx: usize,
     xdx: usize,
     ydx: usize,
 }
 
 impl RoundIterator {
     fn new(round: Rc<RefCell<Round>>, direction: Direction) -> Self {
+        let (max_xdx, max_ydx) = {
+            let round = round.borrow();
+            (round.slots.len() - 1, round.slots[0].len() - 1)
+        };
+
         let (xdx, ydx) = match direction {
             Direction::Left => (0, 0),
-            Direction::Right => (3, 0),
+            Direction::Right => (max_xdx, 0),
             Direction::Up => (0, 0),
-            Direction::Down => (0, 3),
+            Direction::Down => (0, max_ydx),
         };
 
         RoundIterator {
-            round,
             direction,
+            max_xdx,
+            max_ydx,
             xdx,
             ydx,
         }
@@ -169,13 +172,13 @@ impl Iterator for RoundIterator {
     type Item = Idx;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if (self.xdx, self.ydx) == (3, 3) {
+        if (self.xdx, self.ydx) == (self.max_xdx, self.max_ydx) {
             return None;
         }
         match (&self.direction, self.xdx, self.ydx) {
-            (Direction::Left, 3, 3) => None,
+            (Direction::Left, xdx, ydx) if (xdx, ydx) == (self.max_xdx, self.max_ydx) => None,
             (Direction::Left, xdx, ydx) => {
-                if xdx == 3 {
+                if xdx == self.max_xdx {
                     self.xdx = 0;
                     self.ydx += 1;
                 } else {
@@ -183,19 +186,19 @@ impl Iterator for RoundIterator {
                 }
                 Some(Idx(xdx, ydx))
             }
-            (Direction::Right, 0, 3) => None,
+            (Direction::Right, 0, ydx) if ydx == self.max_ydx => None,
             (Direction::Right, xdx, ydx) => {
                 if xdx == 0 {
-                    self.xdx = 0;
+                    self.xdx = self.max_xdx;
                     self.ydx += 1;
                 } else {
                     self.xdx -= 1;
                 }
                 Some(Idx(xdx, ydx))
             }
-            (Direction::Up, 3, 3) => None,
+            (Direction::Up, xdx, ydx) if (xdx, ydx) == (self.max_xdx, self.max_ydx) => None,
             (Direction::Up, xdx, ydx) => {
-                if ydx == 3 {
+                if ydx == self.max_ydx {
                     self.ydx = 0;
                     self.xdx += 1;
                 } else {
@@ -203,10 +206,10 @@ impl Iterator for RoundIterator {
                 }
                 Some(Idx(xdx, ydx))
             }
-            (Direction::Down, 3, 0) => None,
+            (Direction::Down, xdx, 0) if xdx == self.max_xdx => None,
             (Direction::Down, xdx, ydx) => {
                 if ydx == 0 {
-                    self.ydx = 3;
+                    self.ydx = self.max_ydx;
                     self.xdx += 1;
                 } else {
                     self.ydx -= 1;
@@ -215,4 +218,10 @@ impl Iterator for RoundIterator {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn round_shift_left() {}
 }
