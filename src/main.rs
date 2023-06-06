@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
     terminal,
@@ -41,11 +44,13 @@ impl Board {
             .rounds
             .last()
             .expect("there should always be a previous round");
-        let mut next = prev.clone();
+        let mut hint = AnimationHint::default();
+        let next = Rc::new(RefCell::new(prev.clone()));
         {
-            let _round_iter = Round::iter_mut(&mut next, direction);
+            let _round_iter = Round::iter_mut(next.clone(), direction);
         }
-        self.rounds.push(next);
+        self.rounds
+            .push(Rc::into_inner(next).expect("meow").into_inner());
         Some(AnimationHint::default())
     }
 }
@@ -79,7 +84,7 @@ impl<'a> Round {
         r
     }
 
-    fn iter_mut(round: &'a mut Round, direction: Direction) -> RoundIterator<'a> {
+    fn iter_mut(round: Rc<RefCell<Round>>, direction: Direction) -> RoundIterator {
         RoundIterator {
             round,
             direction,
@@ -96,34 +101,81 @@ impl<'a> Round {
     }
 }
 
-struct RoundIterator<'a> {
-    round: &'a mut Round,
+struct RoundIterator {
+    round: Rc<RefCell<Round>>,
     direction: Direction,
     xdx: usize,
     ydx: usize,
 }
 
-impl<'a> Iterator for RoundIterator<'a> {
-    type Item = &'a mut u16;
+impl RoundIterator {
+    fn new(round: Rc<RefCell<Round>>, direction: Direction) -> Self {
+        let (xdx, ydx) = match direction {
+            Direction::Left => (0, 0),
+            Direction::Right => (3, 0),
+            Direction::Up => (0, 0),
+            Direction::Down => (0, 3),
+        };
+
+        RoundIterator {
+            round,
+            direction,
+            xdx,
+            ydx,
+        }
+    }
+}
+
+struct Idx(usize, usize);
+
+impl Iterator for RoundIterator {
+    type Item = Idx;
 
     fn next(&mut self) -> Option<Self::Item> {
         if (self.xdx, self.ydx) == (3, 3) {
             return None;
         }
-        let (xdx, ydx) = match self.direction {
-            Direction::Left => (0, 0),
-            Direction::Right => (0, 0),
-            Direction::Up => (0, 0),
-            Direction::Down => (0, 0),
-        };
-        //Some(
-        //    self.round
-        //        .get_mut(xdx, ydx)
-        //        .expect("x and y indices must always be valid"),
-        //)
-        match self.round.slots.get_mut(ydx) {
-            Some(row) => row.get_mut(xdx),
-            None => None,
+        match (&self.direction, self.xdx, self.ydx) {
+            (Direction::Left, 3, 3) => None,
+            (Direction::Left, xdx, ydx) => {
+                if xdx == 3 {
+                    self.xdx = 0;
+                    self.ydx += 1;
+                } else {
+                    self.xdx += 1;
+                }
+                Some(Idx(xdx, ydx))
+            },
+            (Direction::Right, 0, 3) => None,
+            (Direction::Right, xdx, ydx) => {
+                if xdx == 0 {
+                    self.xdx = 0;
+                    self.ydx += 1;
+                } else {
+                    self.xdx -= 1;
+                }
+                Some(Idx(xdx, ydx))
+            },
+            (Direction::Up, 3, 3) => None,
+            (Direction::Up, xdx, ydx) => {
+                if ydx == 3 {
+                    self.ydx = 0;
+                    self.xdx += 1;
+                } else {
+                    self.ydx += 1;
+                }
+                Some(Idx(xdx, ydx))
+            },
+            (Direction::Down, 3, 0) => None,
+            (Direction::Down, xdx, ydx) => {
+                if ydx == 0 {
+                    self.ydx = 3;
+                    self.xdx += 1;
+                } else {
+                    self.ydx -= 1;
+                }
+                Some(Idx(xdx, ydx))
+            },
         }
     }
 }
