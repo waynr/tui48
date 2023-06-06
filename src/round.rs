@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
@@ -62,8 +59,8 @@ impl Round {
 
 // private methods
 impl Round {
-    fn iter_mut(round: Rc<RefCell<Round>>, direction: Direction) -> RoundIterator {
-        RoundIterator::new(round, direction)
+    fn iter_mut(&self, direction: Direction) -> RoundIterator {
+        RoundIterator::new(self, direction)
     }
 
     fn get(&self, idx: &Idx) -> u16 {
@@ -88,18 +85,17 @@ impl Round {
         *rf = value;
     }
 
-    pub fn shift(round: Rc<RefCell<Self>>, direction: Direction) -> Option<AnimationHint> {
+    pub fn shift(&mut self, direction: Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::default();
-        let idxs = Round::iter_mut(round.clone(), direction).collect::<Vec<Idx>>();
-        let mut round = round.borrow_mut();
+        let idxs = self.iter_mut(direction).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
         for row in rows {
             let mut row_iter = row.iter();
             let mut pivot_idx = row_iter.next().expect("should always yield an index");
             let mut empty_slot_idx: Option<Idx> = None;
             while let Some(cmp_idx) = row_iter.next() {
-                let pivot = round.get(pivot_idx);
-                let cmp = round.get(cmp_idx);
+                let pivot = self.get(pivot_idx);
+                let cmp = self.get(cmp_idx);
                 // if the cmp element is 0, move on to the next element in the row
                 if cmp == 0 {
                     if empty_slot_idx.is_none() {
@@ -110,17 +106,17 @@ impl Round {
                 // if the pivot element is 0 and the cmp isn't, replace the pivot element with the
                 // cmp and zero the cmp
                 if pivot == 0 {
-                    round.set(pivot_idx, cmp);
-                    round.set(cmp_idx, 0);
+                    self.set(pivot_idx, cmp);
+                    self.set(cmp_idx, 0);
                     hint.set(cmp_idx, pivot_idx.clone());
                     continue;
                 }
                 // if the pivot element and the cmp element are equal then they must be combined;
                 // do so and increment the score by the value of the eliminated element
                 if pivot == cmp {
-                    round.score += cmp;
-                    round.set(pivot_idx, pivot + cmp);
-                    round.set(cmp_idx, 0);
+                    self.score += cmp;
+                    self.set(pivot_idx, pivot + cmp);
+                    self.set(cmp_idx, 0);
                     hint.set(cmp_idx, pivot_idx.clone());
                 }
                 // at this point we can consider the current cmp element to be the new pivot for
@@ -145,9 +141,8 @@ struct RoundIterator {
 }
 
 impl RoundIterator {
-    fn new(round: Rc<RefCell<Round>>, direction: Direction) -> Self {
+    fn new(round: &Round, direction: Direction) -> Self {
         let (max_xdx, max_ydx) = {
-            let round = round.borrow();
             (round.slots.len() - 1, round.slots[0].len() - 1)
         };
 

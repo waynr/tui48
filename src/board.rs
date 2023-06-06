@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use rand::rngs::ThreadRng;
 
 use crate::round::{AnimationHint, Round};
@@ -40,15 +37,11 @@ impl Board {
             .rounds
             .last()
             .expect("there should always be a previous round");
-        let round = Rc::new(RefCell::new(prev.clone()));
-        let hint = Round::shift(round.clone(), direction.clone());
+        let mut round = prev.clone();
+        let hint = round.shift(direction.clone());
 
         if hint.is_some() {
-            self.rounds.push(
-                Rc::into_inner(round)
-                    .expect("there should only be one strong reference at this point")
-                    .into_inner(),
-            );
+            self.rounds.push(round);
         }
         hint
     }
