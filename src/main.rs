@@ -13,7 +13,7 @@ use rand::{thread_rng, Rng};
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 /// Direction represents the direction indicated by the player.
-#[derive(Default)]
+#[derive(Clone, Default)]
 enum Direction {
     #[default]
     Left,
@@ -35,39 +35,103 @@ impl Board {
         Self { rng, rounds }
     }
 
-    fn score(&self) -> u32 {
+    fn score(&self) -> u16 {
         self.rounds.last().map_or(0, |r| r.score)
     }
 
-    fn shift(&mut self, direction: Direction) -> Option<AnimationHint> {
+    /// try_shift attempts to shift the board in the given direction and returns an AnimationHint
+    /// if anything changes.
+    fn try_shift(&mut self, direction: Direction) -> Option<AnimationHint> {
         let prev = self
             .rounds
             .last()
             .expect("there should always be a previous round");
         let mut hint = AnimationHint::default();
-        let next = Rc::new(RefCell::new(prev.clone()));
+        let round = Rc::new(RefCell::new(prev.clone()));
+        let idxs = Round::iter_mut(round.clone(), direction).collect::<Vec<Idx>>();
         {
-            let _round_iter = Round::iter_mut(next.clone(), direction);
+            let mut round = round.borrow_mut();
+            let rows = idxs.chunks(4);
+            for row in rows {
+                let mut row_iter = row.iter();
+                let mut pivot_idx = row_iter.next().expect("should always yield an index");
+                let mut empty_slot_idx: Option<Idx> = None;
+                while let Some(cmp_idx) = row_iter.next() {
+                    let pivot = round.get(pivot_idx);
+                    let cmp = round.get(cmp_idx);
+                    // if the cmp element is 0, move on to the next element in the row
+                    if cmp == 0 {
+                        if empty_slot_idx.is_none() {
+                            empty_slot_idx = Some(cmp_idx.clone());
+                        }
+                        continue;
+                    }
+                    // if the pivot element is 0 and the cmp isn't, replace the pivot element with
+                    // the cmp and zero the cmp
+                    if pivot == 0 {
+                        round.set(pivot_idx, cmp);
+                        round.set(cmp_idx, 0);
+                        hint.set(cmp_idx, pivot_idx.clone());
+                        continue;
+                    }
+                    // if the pivot element and the cmp element are equal then they must be
+                    // combined; do so and increment the score by the value of the eliminated
+                    // element
+                    if pivot == cmp {
+                        round.score += cmp;
+                        round.set(pivot_idx, pivot + cmp);
+                        round.set(cmp_idx, 0);
+                        hint.set(cmp_idx, pivot_idx.clone());
+                    }
+                    // at this point we can consider the current cmp element to be the new pivot
+                    // for subsequent iterations
+                    pivot_idx = cmp_idx;
+                }
+            }
         }
-        self.rounds
-            .push(Rc::into_inner(next).expect("meow").into_inner());
-        Some(AnimationHint::default())
+
+        if hint.changed {
+            self.rounds.push(
+                Rc::into_inner(round)
+                    .expect("there should only be one strong reference at this point")
+                    .into_inner(),
+            );
+            Some(hint)
+        } else {
+            None
+        }
     }
 }
 
 #[derive(Default)]
 struct AnimationHint {
-    direction: Direction,
-    hint: [[u8; 4]; 4],
+    hint: [[Option<Idx>; 4]; 4],
+    changed: bool,
+}
+
+impl AnimationHint {
+    fn get_mut(&mut self, idx: &Idx) -> &mut Option<Idx> {
+        self.hint
+            .get_mut(idx.1)
+            .expect("Idx should never be invalid")
+            .get_mut(idx.0)
+            .expect("Idx should never be invalid")
+    }
+
+    fn set(&mut self, idx: &Idx, value: Idx) {
+        self.changed = true;
+        let rf = self.get_mut(idx);
+        *rf = Some(value);
+    }
 }
 
 #[derive(Clone, Default)]
 struct Round {
     slots: [[u16; 4]; 4],
-    score: u32,
+    score: u16,
 }
 
-impl<'a> Round {
+impl Round {
     fn random(rng: &mut ThreadRng) -> Self {
         let mut r = Round::default();
         let (xdx2, ydx2) = (0, 0);
@@ -93,11 +157,26 @@ impl<'a> Round {
         }
     }
 
-    fn get(&mut self, xdx: usize, ydx: usize) -> Option<&mut u16> {
-        match self.slots.get_mut(ydx) {
-            Some(row) => row.get_mut(xdx),
-            None => None,
-        }
+    fn get(&self, idx: &Idx) -> u16 {
+        *self
+            .slots
+            .get(idx.1)
+            .expect("Idx should never be invalid")
+            .get(idx.0)
+            .expect("Idx should never be invalid")
+    }
+
+    fn get_mut(&mut self, idx: &Idx) -> &mut u16 {
+        self.slots
+            .get_mut(idx.1)
+            .expect("Idx should never be invalid")
+            .get_mut(idx.0)
+            .expect("Idx should never be invalid")
+    }
+
+    fn set(&mut self, idx: &Idx, value: u16) {
+        let rf = self.get_mut(idx);
+        *rf = value;
     }
 }
 
@@ -126,6 +205,7 @@ impl RoundIterator {
     }
 }
 
+#[derive(Clone, Default)]
 struct Idx(usize, usize);
 
 impl Iterator for RoundIterator {
@@ -145,7 +225,7 @@ impl Iterator for RoundIterator {
                     self.xdx += 1;
                 }
                 Some(Idx(xdx, ydx))
-            },
+            }
             (Direction::Right, 0, 3) => None,
             (Direction::Right, xdx, ydx) => {
                 if xdx == 0 {
@@ -155,7 +235,7 @@ impl Iterator for RoundIterator {
                     self.xdx -= 1;
                 }
                 Some(Idx(xdx, ydx))
-            },
+            }
             (Direction::Up, 3, 3) => None,
             (Direction::Up, xdx, ydx) => {
                 if ydx == 3 {
@@ -165,7 +245,7 @@ impl Iterator for RoundIterator {
                     self.ydx += 1;
                 }
                 Some(Idx(xdx, ydx))
-            },
+            }
             (Direction::Down, 3, 0) => None,
             (Direction::Down, xdx, ydx) => {
                 if ydx == 0 {
@@ -175,7 +255,7 @@ impl Iterator for RoundIterator {
                     self.ydx -= 1;
                 }
                 Some(Idx(xdx, ydx))
-            },
+            }
         }
     }
 }
