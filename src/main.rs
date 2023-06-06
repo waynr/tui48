@@ -1,26 +1,70 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
     terminal,
 };
 
-use rand::{thread_rng, Rng};
 use rand::rngs::ThreadRng;
+use rand::{thread_rng, Rng};
 
-/// The Result type for mastermind.
+/// The Result type for tui48.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+/// Direction represents the direction indicated by the player.
 #[derive(Default)]
+enum Direction {
+    #[default]
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+/// Board represents a 2048 board that keeps track of the history of its game states.
 struct Board {
     rng: ThreadRng,
-    basket: ValueBasket,
-    slots: [[Slot;4] ;4]
+    rounds: Vec<Round>,
 }
 
 impl Board {
     fn new(mut rng: ThreadRng) -> Self {
+        let mut rounds = Vec::with_capacity(2000);
+        rounds.push(Round::random(&mut rng));
+        Self { rng, rounds }
+    }
+
+    fn score(&self) -> u32 {
+        self.rounds.last().map_or(0, |r| r.score)
+    }
+
+    fn shift(&mut self, direction: Direction) -> Option<AnimationHint> {
+        let prev = self
+            .rounds
+            .last()
+            .expect("there should always be a previous round");
+        let mut next = prev.clone();
+        {
+            let _round_iter = Round::iter_mut(&mut next, direction);
+        }
+        self.rounds.push(next);
+        Some(AnimationHint::default())
+    }
+}
+
+#[derive(Default)]
+struct AnimationHint {
+    direction: Direction,
+    hint: [[u8; 4]; 4],
+}
+
+#[derive(Clone, Default)]
+struct Round {
+    slots: [[u16; 4]; 4],
+    score: u32,
+}
+
+impl<'a> Round {
+    fn random(rng: &mut ThreadRng) -> Self {
+        let mut r = Round::default();
         let (xdx2, ydx2) = (0, 0);
         let (xdx1, ydx1) = (rng.gen_range(0..3), rng.gen_range(0..3));
         loop {
@@ -30,70 +74,63 @@ impl Board {
             }
             break;
         }
-        let mut b = Self {
-            rng,
-            basket: ValueBasket::default(),
-            slots: [
-                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
-                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
-                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
-                [Slot::default(), Slot::default(), Slot::default(), Slot::default()],
-            ],
-        };
-        b.slots[ydx1][xdx1].set(b.basket.get());
-        b.slots[ydx2][xdx2].set(b.basket.get());
-        b
-    }
-}
-
-#[derive(Default)]
-struct Slot {
-    value: Option<Rc<RefCell<Value>>>,
-}
-
-impl Slot {
-    fn set(&mut self, value: Rc<RefCell<Value>>) {
-        self.value = Some(value)
+        r.slots[ydx1][xdx1] = 2;
+        r.slots[ydx2][xdx2] = 2;
+        r
     }
 
-    fn unset(&mut self) {
-        self.value = None
-    }
-}
-
-struct Value(u16);
-
-impl Default for Value {
-    fn default() -> Self {
-        Value(2)
-    }
-}
-
-#[derive(Default)]
-struct ValueBasket {
-    values: [Rc<RefCell<Value>>; 25],
-}
-
-impl ValueBasket {
-    fn get(&self) -> Rc<RefCell<Value>> {
-        let v = self.values
-            .iter()
-            .find(|item| Rc::<_>::strong_count(item) == 1)
-            .expect("something is wrong if we can't find a value here!")
-            .clone();
-        if v.borrow().0 != 2 {
-            let mut mutv = v.borrow_mut();
-            mutv.0 = 2;
+    fn iter_mut(round: &'a mut Round, direction: Direction) -> RoundIterator<'a> {
+        RoundIterator {
+            round,
+            direction,
+            xdx: 0,
+            ydx: 0,
         }
-        v
+    }
+
+    fn get(&mut self, xdx: usize, ydx: usize) -> Option<&mut u16> {
+        match self.slots.get_mut(ydx) {
+            Some(row) => row.get_mut(xdx),
+            None => None,
+        }
+    }
+}
+
+struct RoundIterator<'a> {
+    round: &'a mut Round,
+    direction: Direction,
+    xdx: usize,
+    ydx: usize,
+}
+
+impl<'a> Iterator for RoundIterator<'a> {
+    type Item = &'a mut u16;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if (self.xdx, self.ydx) == (3, 3) {
+            return None;
+        }
+        let (xdx, ydx) = match self.direction {
+            Direction::Left => (0, 0),
+            Direction::Right => (0, 0),
+            Direction::Up => (0, 0),
+            Direction::Down => (0, 0),
+        };
+        //Some(
+        //    self.round
+        //        .get_mut(xdx, ydx)
+        //        .expect("x and y indices must always be valid"),
+        //)
+        match self.round.slots.get_mut(ydx) {
+            Some(row) => row.get_mut(xdx),
+            None => None,
+        }
     }
 }
 
 fn main() -> Result<()> {
-    let mut board = Board::default();
-    let value_buf = ValueBasket::default();
-
-    board.slots[0][0].set(value_buf.get());
+    let rng = thread_rng();
+    let mut board = Board::new(rng);
 
     terminal::enable_raw_mode()?;
     while let Event::Key(KeyEvent { code, .. }) = event::read()? {
