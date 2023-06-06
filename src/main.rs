@@ -5,11 +5,11 @@ use crossterm::{
 use rand::thread_rng;
 
 mod board;
-mod round;
 mod error;
+mod round;
 
+use board::{Board, Direction};
 use error::Result;
-use board::Board;
 
 fn main() -> Result<()> {
     let rng = thread_rng();
@@ -24,7 +24,9 @@ fn main() -> Result<()> {
             KeyCode::Char(c) => {
                 break;
             }
-            _ => {}
+            _ => {
+                let _hint = board.shift(Direction::Left);
+            }
         }
     }
     terminal::disable_raw_mode()?;

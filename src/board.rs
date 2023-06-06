@@ -35,7 +35,7 @@ impl Board {
 
     /// try_shift attempts to shift the board in the given direction and returns an AnimationHint
     /// if anything changes.
-    fn try_shift(&mut self, direction: Direction) -> Option<AnimationHint> {
+    pub(crate) fn shift(&mut self, direction: Direction) -> Option<AnimationHint> {
         let prev = self
             .rounds
             .last()
@@ -52,10 +52,4 @@ impl Board {
         }
         hint
     }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn round_shift_left() {}
 }
