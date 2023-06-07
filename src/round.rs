@@ -90,17 +90,14 @@ impl Round {
         let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
         for row in rows {
-            let mut row_iter = row.iter();
-            let mut pivot_idx = row_iter.next().expect("should always yield an index");
-            let mut empty_slot_idx: Option<Idx> = None;
-            while let Some(cmp_idx) = row_iter.next() {
+            let mut pivot_iter = row.iter();
+            let mut pivot_idx = pivot_iter.next().expect("should always yield an index");
+            let mut cmp_iter = pivot_iter.clone();
+            while let Some(cmp_idx) = cmp_iter.next() {
                 let pivot = self.get(pivot_idx);
                 let cmp = self.get(cmp_idx);
                 // if the cmp element is 0, move on to the next element in the row
                 if cmp == 0 {
-                    if empty_slot_idx.is_none() {
-                        empty_slot_idx = Some(cmp_idx.clone());
-                    }
                     continue;
                 }
                 // if the pivot element is 0 and the cmp isn't, replace the pivot element with the
@@ -119,9 +116,11 @@ impl Round {
                     self.set(cmp_idx, 0);
                     hint.set(cmp_idx, pivot_idx.clone());
                 }
-                // at this point we can consider the current cmp element to be the new pivot for
-                // subsequent iterations
-                pivot_idx = cmp_idx;
+                if let Some(idx) = pivot_iter.next() {
+                    pivot_idx = idx;
+                } else {
+                    break; // no more pivots to test!
+                }
             }
         }
         if hint.changed {
