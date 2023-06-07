@@ -134,27 +134,27 @@ impl Round {
 
 struct RoundIterator {
     direction: Direction,
-    max_xdx: usize,
-    max_ydx: usize,
+    x_width: usize,
+    y_width: usize,
     xdx: usize,
     ydx: usize,
 }
 
 impl RoundIterator {
     fn new(round: &Round, direction: Direction) -> Self {
-        let (max_xdx, max_ydx) = { (round.slots.len() - 1, round.slots[0].len() - 1) };
+        let (x_width, y_width) = { (round.slots.len(), round.slots[0].len()) };
 
         let (xdx, ydx) = match direction {
             Direction::Left => (0, 0),
-            Direction::Right => (max_xdx, 0),
+            Direction::Right => (x_width-1, 0),
             Direction::Up => (0, 0),
-            Direction::Down => (0, max_ydx),
+            Direction::Down => (0, y_width-1),
         };
 
         RoundIterator {
             direction,
-            max_xdx,
-            max_ydx,
+            x_width,
+            y_width,
             xdx,
             ydx,
         }
@@ -165,13 +165,10 @@ impl Iterator for RoundIterator {
     type Item = Idx;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if (self.xdx, self.ydx) == (self.max_xdx, self.max_ydx) {
-            return None;
-        }
         match (&self.direction, self.xdx, self.ydx) {
-            (Direction::Left, xdx, ydx) if (xdx, ydx) == (self.max_xdx, self.max_ydx) => None,
+            (Direction::Left, _, ydx) if ydx == self.y_width => None,
             (Direction::Left, xdx, ydx) => {
-                if xdx == self.max_xdx {
+                if xdx == self.x_width - 1 {
                     self.xdx = 0;
                     self.ydx += 1;
                 } else {
@@ -179,19 +176,19 @@ impl Iterator for RoundIterator {
                 }
                 Some(Idx(xdx, ydx))
             }
-            (Direction::Right, 0, ydx) if ydx == self.max_ydx => None,
+            (Direction::Right, _, ydx) if ydx == self.y_width => None,
             (Direction::Right, xdx, ydx) => {
                 if xdx == 0 {
-                    self.xdx = self.max_xdx;
+                    self.xdx = self.x_width - 1;
                     self.ydx += 1;
                 } else {
                     self.xdx -= 1;
                 }
                 Some(Idx(xdx, ydx))
             }
-            (Direction::Up, xdx, ydx) if (xdx, ydx) == (self.max_xdx, self.max_ydx) => None,
+            (Direction::Up, xdx, _) if xdx == self.x_width => None,
             (Direction::Up, xdx, ydx) => {
-                if ydx == self.max_ydx {
+                if ydx == self.y_width - 1 {
                     self.ydx = 0;
                     self.xdx += 1;
                 } else {
@@ -199,10 +196,10 @@ impl Iterator for RoundIterator {
                 }
                 Some(Idx(xdx, ydx))
             }
-            (Direction::Down, xdx, 0) if xdx == self.max_xdx => None,
+            (Direction::Down, xdx, _) if xdx == self.x_width => None,
             (Direction::Down, xdx, ydx) => {
                 if ydx == 0 {
-                    self.ydx = self.max_ydx;
+                    self.ydx = self.y_width - 1;
                     self.xdx += 1;
                 } else {
                     self.ydx -= 1;
