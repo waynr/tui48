@@ -28,7 +28,7 @@ impl AnimationHint {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Round {
     slots: [[u16; 4]; 4],
     score: u16,
@@ -85,9 +85,9 @@ impl Round {
         *rf = value;
     }
 
-    pub fn shift(&mut self, direction: Direction) -> Option<AnimationHint> {
+    pub fn shift(&mut self, direction: &Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::default();
-        let idxs = self.iter_mut(direction).collect::<Vec<Idx>>();
+        let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
         for row in rows {
             let mut row_iter = row.iter();
@@ -142,9 +142,7 @@ struct RoundIterator {
 
 impl RoundIterator {
     fn new(round: &Round, direction: Direction) -> Self {
-        let (max_xdx, max_ydx) = {
-            (round.slots.len() - 1, round.slots[0].len() - 1)
-        };
+        let (max_xdx, max_ydx) = { (round.slots.len() - 1, round.slots[0].len() - 1) };
 
         let (xdx, ydx) = match direction {
             Direction::Left => (0, 0),
@@ -217,6 +215,70 @@ impl Iterator for RoundIterator {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use rstest::*;
+
     #[test]
-    fn round_shift_left() {}
+    fn clone() {
+        let initial = Round {
+            score: 0,
+            slots: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+        };
+        let cloned = initial.clone();
+        assert_eq!(initial, cloned);
+        assert_eq!(initial.score, cloned.score);
+    }
+
+    #[test]
+    fn shift_empty() {
+        let initial = Round {
+            score: 0,
+            slots: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+        };
+
+        for direction in [
+            Direction::Left,
+            Direction::Right,
+            Direction::Up,
+            Direction::Down,
+        ] {
+            let mut shifted = initial.clone();
+            let hint = shifted.shift(&direction);
+            assert_eq!(initial, shifted, "shifting {:?}", direction);
+            assert_eq!(initial.score, shifted.score, "shifting {:?}", direction);
+        }
+    }
+
+    #[rstest]
+    #[case::identity_left(Direction::Left, 
+           [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+           [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]])]
+    #[case::identity_right(Direction::Right,
+           [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+           [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]])]
+    #[case::identity_up(Direction::Up,
+           [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])]
+    #[case::identity_down(Direction::Down,
+           [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
+           [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]])]
+    fn shift(#[case] direction: Direction, #[case] initial: [[u16; 4]; 4], #[case] expected: [[u16; 4]; 4]) {
+        let initial = Round {
+            score: 0,
+            slots: initial,
+        };
+
+        let expected = Round {
+            score: 0,
+            slots: expected,
+        };
+
+        let mut shifted = initial.clone();
+        let hint = shifted.shift(&direction);
+        assert_eq!(
+            shifted, expected,
+            "shifting {:?}",
+            direction
+        );
+    }
 }

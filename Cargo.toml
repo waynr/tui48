@@ -9,3 +9,7 @@ edition = "2021"
 
 crossterm = "0.26"
 rand = "0.8.5"
+
+[dev-dependencies]
+
+rstest = "0.17.0"

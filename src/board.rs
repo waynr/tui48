@@ -3,7 +3,7 @@ use rand::rngs::ThreadRng;
 use crate::round::{AnimationHint, Round};
 
 /// Direction represents the direction indicated by the player.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) enum Direction {
     #[default]
     Left,
@@ -38,7 +38,7 @@ impl Board {
             .last()
             .expect("there should always be a previous round");
         let mut round = prev.clone();
-        let hint = round.shift(direction.clone());
+        let hint = round.shift(&direction);
 
         if hint.is_some() {
             self.rounds.push(round);
