@@ -165,48 +165,67 @@ impl Iterator for RoundIterator {
     type Item = Idx;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (&self.direction, self.xdx, self.ydx) {
-            (Direction::Left, _, ydx) if ydx == self.y_width => None,
-            (Direction::Left, xdx, ydx) => {
-                if xdx == self.x_width - 1 {
-                    self.xdx = 0;
-                    self.ydx += 1;
-                } else {
-                    self.xdx += 1;
-                }
-                Some(Idx(xdx, ydx))
-            }
-            (Direction::Right, _, ydx) if ydx == self.y_width => None,
-            (Direction::Right, xdx, ydx) => {
-                if xdx == 0 {
-                    self.xdx = self.x_width - 1;
-                    self.ydx += 1;
-                } else {
-                    self.xdx -= 1;
-                }
-                Some(Idx(xdx, ydx))
-            }
-            (Direction::Up, xdx, _) if xdx == self.x_width => None,
-            (Direction::Up, xdx, ydx) => {
-                if ydx == self.y_width - 1 {
-                    self.ydx = 0;
-                    self.xdx += 1;
-                } else {
-                    self.ydx += 1;
-                }
-                Some(Idx(xdx, ydx))
-            }
-            (Direction::Down, xdx, _) if xdx == self.x_width => None,
-            (Direction::Down, xdx, ydx) => {
-                if ydx == 0 {
-                    self.ydx = self.y_width - 1;
-                    self.xdx += 1;
-                } else {
-                    self.ydx -= 1;
-                }
-                Some(Idx(xdx, ydx))
-            }
+        match &self.direction {
+            Direction::Left => self.next_left(),
+            Direction::Right => self.next_right(),
+            Direction::Up => self.next_up(),
+            Direction::Down => self.next_down(),
         }
+    }
+}
+
+impl RoundIterator {
+    fn next_left(&mut self) -> Option<Idx> {
+        let (xdx, ydx) = (self.xdx, self.ydx);
+        if ydx == self.y_width {
+            return None;
+        }
+        if xdx == self.x_width - 1 {
+            self.xdx = 0;
+            self.ydx += 1;
+        } else {
+            self.xdx += 1;
+        }
+        Some(Idx(xdx, ydx))
+    }
+    fn next_right(&mut self) -> Option<Idx> {
+        let (xdx, ydx) = (self.xdx, self.ydx);
+        if ydx == self.y_width {
+            return None;
+        }
+        if xdx == 0 {
+            self.xdx = self.x_width - 1;
+            self.ydx += 1;
+        } else {
+            self.xdx -= 1;
+        }
+        Some(Idx(xdx, ydx))
+    }
+    fn next_up(&mut self) -> Option<Idx> {
+        let (xdx, ydx) = (self.xdx, self.ydx);
+        if xdx == self.x_width {
+            return None;
+        }
+        if ydx == self.y_width - 1 {
+            self.ydx = 0;
+            self.xdx += 1;
+        } else {
+            self.ydx += 1;
+        }
+        Some(Idx(xdx, ydx))
+    }
+    fn next_down(&mut self) -> Option<Idx> {
+        let (xdx, ydx) = (self.xdx, self.ydx);
+        if xdx == self.x_width {
+            return None;
+        }
+        if ydx == 0 {
+            self.ydx = self.y_width - 1;
+            self.xdx += 1;
+        } else {
+            self.ydx -= 1;
+        }
+        Some(Idx(xdx, ydx))
     }
 }
 
