@@ -146,9 +146,9 @@ impl RoundIterator {
 
         let (xdx, ydx) = match direction {
             Direction::Left => (0, 0),
-            Direction::Right => (x_width-1, 0),
+            Direction::Right => (x_width - 1, 0),
             Direction::Up => (0, 0),
-            Direction::Down => (0, y_width-1),
+            Direction::Down => (0, y_width - 1),
         };
 
         RoundIterator {
@@ -247,7 +247,7 @@ mod test {
     }
 
     #[rstest]
-    #[case::identity_left(Direction::Left, 
+    #[case::identity_left(Direction::Left,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
            [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
@@ -263,7 +263,7 @@ mod test {
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
            [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
     )]
-    #[case::flipped_identity_left(Direction::Left, 
+    #[case::flipped_identity_left(Direction::Left,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
            [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
@@ -299,7 +299,11 @@ mod test {
            [[0, 1, 2, 3], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
            [[1, 2, 3, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
     )]
-    fn shift(#[case] direction: Direction, #[case] initial: [[u16; 4]; 4], #[case] expected: [[u16; 4]; 4]) {
+    fn shift(
+        #[case] direction: Direction,
+        #[case] initial: [[u16; 4]; 4],
+        #[case] expected: [[u16; 4]; 4],
+    ) {
         let initial = Round {
             score: 0,
             slots: initial,
@@ -312,15 +316,11 @@ mod test {
 
         let mut shifted = initial.clone();
         let hint = shifted.shift(&direction);
-        assert_eq!(
-            shifted, expected,
-            "shifting {:?}",
-            direction
-        );
+        assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 
-    fn round(slots: [[u16;4];4], score: u16) -> Round {
-        Round{ score, slots, }
+    fn round(slots: [[u16; 4]; 4], score: u16) -> Round {
+        Round { score, slots }
     }
 
     #[rstest]
@@ -349,7 +349,6 @@ mod test {
         round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
         round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
     )]
-
     #[case::all1s_right(
         Direction::Right,
         round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
@@ -373,10 +372,6 @@ mod test {
     fn combine(#[case] direction: Direction, #[case] initial: Round, #[case] expected: Round) {
         let mut shifted = initial.clone();
         let hint = shifted.shift(&direction);
-        assert_eq!(
-            shifted, expected,
-            "shifting {:?}",
-            direction
-        );
+        assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 }
