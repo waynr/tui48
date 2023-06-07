@@ -295,6 +295,10 @@ mod test {
            [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
            [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
     )]
+    #[case::combine(Direction::Left,
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+           [[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+    )]
     fn shift(#[case] direction: Direction, #[case] initial: [[u16; 4]; 4], #[case] expected: [[u16; 4]; 4]) {
         let initial = Round {
             score: 0,
@@ -306,6 +310,67 @@ mod test {
             slots: expected,
         };
 
+        let mut shifted = initial.clone();
+        let hint = shifted.shift(&direction);
+        assert_eq!(
+            shifted, expected,
+            "shifting {:?}",
+            direction
+        );
+    }
+
+    fn round(slots: [[u16;4];4], score: u16) -> Round {
+        Round{ score, slots, }
+    }
+
+    #[rstest]
+    #[case::all1s(
+        Direction::Left,
+        round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+    )]
+    #[case::combine2s_shift_remaining(
+        Direction::Left,
+        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+        round([[4, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+    )]
+    #[case::combine2s_shift_remaining(
+        Direction::Left,
+        round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+        round([[4, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+    )]
+    #[case::combine2s_ignore_4(
+        Direction::Left,
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[4, 4, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+    )]
+    #[case::noop_no_compatible_combinations(
+        Direction::Left,
+        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+    )]
+
+    #[case::all1s_right(
+        Direction::Right,
+        round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[0, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+    )]
+    #[case::combine2s_shift_remaining_right(
+        Direction::Right,
+        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+        round([[0, 0, 2, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+    )]
+    #[case::combine2s_ignore_4_right(
+        Direction::Right,
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[0, 0, 4, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+    )]
+    #[case::noop_no_compatible_combinations_right(
+        Direction::Right,
+        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+    )]
+    fn combine(#[case] direction: Direction, #[case] initial: Round, #[case] expected: Round) {
         let mut shifted = initial.clone();
         let hint = shifted.shift(&direction);
         assert_eq!(
