@@ -118,6 +118,7 @@ impl Round {
                 }
                 if let Some(idx) = pivot_iter.next() {
                     pivot_idx = idx;
+                    cmp_iter = pivot_iter.clone();
                 } else {
                     break; // no more pivots to test!
                 }
@@ -294,9 +295,9 @@ mod test {
            [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
            [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
     )]
-    #[case::combine(Direction::Left,
-           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-           [[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+    #[case::pivot_is_zero_with_multiple_shift_elements(Direction::Left,
+           [[0, 1, 2, 3], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+           [[1, 2, 3, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
     )]
     fn shift(#[case] direction: Direction, #[case] initial: [[u16; 4]; 4], #[case] expected: [[u16; 4]; 4]) {
         let initial = Round {
