@@ -16,9 +16,9 @@ impl AnimationHint {
     fn get_mut(&mut self, idx: &Idx) -> &mut Option<Idx> {
         self.hint
             .get_mut(idx.1)
-            .expect("Idx should never be invalid")
+            .expect(format!("invalid y coordinate {}", idx.1).as_str())
             .get_mut(idx.0)
-            .expect("Idx should never be invalid")
+            .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
 
     fn set(&mut self, idx: &Idx, value: Idx) {
@@ -67,17 +67,17 @@ impl Round {
         *self
             .slots
             .get(idx.1)
-            .expect("Idx should never be invalid")
+            .expect(format!("invalid y coordinate {}", idx.1).as_str())
             .get(idx.0)
-            .expect("Idx should never be invalid")
+            .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
 
     fn get_mut(&mut self, idx: &Idx) -> &mut u16 {
         self.slots
             .get_mut(idx.1)
-            .expect("Idx should never be invalid")
+            .expect(format!("invalid y coordinate {}", idx.1).as_str())
             .get_mut(idx.0)
-            .expect("Idx should never be invalid")
+            .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
 
     fn set(&mut self, idx: &Idx, value: u16) {
