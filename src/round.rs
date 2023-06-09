@@ -28,9 +28,11 @@ impl AnimationHint {
     }
 }
 
+pub(crate) type Card = u16;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Round {
-    slots: [[u16; 4]; 4],
+    slots: [[Card; 4]; 4],
     score: u16,
 }
 
