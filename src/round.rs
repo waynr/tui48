@@ -59,8 +59,8 @@ impl Round {
 
 // private methods
 impl Round {
-    fn iter_mut(&self, direction: Direction) -> RoundIterator {
-        RoundIterator::new(self, direction)
+    fn iter_mut(&self, direction: Direction) -> Indices {
+        Indices::new(self, direction)
     }
 
     fn get(&self, idx: &Idx) -> u16 {
@@ -132,7 +132,8 @@ impl Round {
     }
 }
 
-struct RoundIterator {
+// Indices is an iterator of Idx over a given round's 2d array of slots.
+struct Indices {
     direction: Direction,
     x_width: usize,
     y_width: usize,
@@ -140,7 +141,7 @@ struct RoundIterator {
     ydx: usize,
 }
 
-impl RoundIterator {
+impl Indices {
     fn new(round: &Round, direction: Direction) -> Self {
         let (x_width, y_width) = { (round.slots.len(), round.slots[0].len()) };
 
@@ -151,7 +152,7 @@ impl RoundIterator {
             Direction::Down => (0, y_width - 1),
         };
 
-        RoundIterator {
+        Indices {
             direction,
             x_width,
             y_width,
@@ -161,7 +162,7 @@ impl RoundIterator {
     }
 }
 
-impl Iterator for RoundIterator {
+impl Iterator for Indices {
     type Item = Idx;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -174,7 +175,7 @@ impl Iterator for RoundIterator {
     }
 }
 
-impl RoundIterator {
+impl Indices {
     fn next_left(&mut self) -> Option<Idx> {
         let (xdx, ydx) = (self.xdx, self.ydx);
         if ydx == self.y_width {
