@@ -45,4 +45,8 @@ impl Board {
         }
         hint
     }
+
+    pub(crate) fn current(&mut self) -> Option<&Round> {
+        self.rounds.last()
+    }
 }

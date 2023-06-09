@@ -15,7 +15,7 @@ fn main() -> Result<()> {
     let rng = thread_rng();
     let board = Board::new(rng);
     let w = stdout().lock();
-    let tui48 = Tui48::new(board, Box::new(w));
+    let tui48 = Tui48::new(board, Box::new(w))?;
 
     tui48.run()
 }
