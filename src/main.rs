@@ -1,35 +1,18 @@
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent},
-    terminal,
-};
 use rand::thread_rng;
 
 mod board;
 mod error;
 mod round;
+mod tui;
 
-use board::{Board, Direction};
+use board::Board;
 use error::Result;
+use tui::Tui48;
 
 fn main() -> Result<()> {
     let rng = thread_rng();
-    let mut board = Board::new(rng);
+    let board = Board::new(rng);
+    let tui48 = Tui48::new(board);
 
-    terminal::enable_raw_mode()?;
-    while let Event::Key(KeyEvent { code, .. }) = event::read()? {
-        match code {
-            KeyCode::Enter => {
-                break;
-            }
-            KeyCode::Char(c) => {
-                break;
-            }
-            _ => {
-                let _hint = board.shift(Direction::Left);
-            }
-        }
-    }
-    terminal::disable_raw_mode()?;
-
-    return Ok(());
+    tui48.run()
 }
