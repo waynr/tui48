@@ -12,6 +12,8 @@ use crossterm::{
 use crate::board::{Board, Direction};
 use crate::error::Result;
 
+pub(crate) mod widget;
+
 enum Event {
     UserInput(UserInput),
 }
@@ -93,7 +95,7 @@ impl<T: Write> Tui48<T> {
         for x in 0..=self.width {
             for y in 0..=self.height {
                 self.w.queue(cursor::MoveTo(x, y))?;
-                self.w.queue(style::Print(' '))?;
+                self.w.queue(style::Print('x'))?;
             }
         }
         self.w.queue(style::ResetColor)?;
