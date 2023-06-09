@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crate::board::Board;
 use crate::error::Result;
-use crate::round::Round;
+use crate::round::{Card, Round};
 
 pub(crate) struct Bounds(u16, u16);
 
@@ -32,6 +32,12 @@ impl<W: Write> Widget<W> for Board {
 }
 
 impl<W: Write> Widget<W> for Round {
+    fn draw(&self, w: W, b: Bounds) -> Result<Bounds> {
+        Ok(Bounds(0,0))
+    }
+}
+
+impl<W: Write> Widget<W> for Card {
     fn draw(&self, w: W, b: Bounds) -> Result<Bounds> {
         Ok(Bounds(0,0))
     }
