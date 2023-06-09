@@ -1,6 +1,13 @@
+use std::io::Write;
+
 use crossterm::{
     event::{self, Event as CrossTermEvent, KeyCode, KeyEvent},
     terminal,
+    terminal::{
+        EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
+    ExecutableCommand,
 };
 
 use crate::board::{Board, Direction};
@@ -15,17 +22,20 @@ enum UserInput {
     Quit,
 }
 
-pub(crate) struct Tui48 {
+pub(crate) struct Tui48<T: Write> {
+    w: Box<T>,
     board: Board,
 }
 
-impl Tui48 {
-    pub(crate) fn new(board: Board) -> Self {
-        Self { board }
+impl<T: Write> Tui48<T> {
+    pub(crate) fn new(board: Board, w: Box<T>) -> Self {
+        Self { board, w }
     }
 
+    /// Run consumes the Tui48 instance and takes control of the terminal to begin gameplay.
     pub(crate) fn run(mut self) -> Result<()> {
         terminal::enable_raw_mode()?;
+        self.w.execute(EnterAlternateScreen)?;
 
         loop {
             match wait_for_event()? {
@@ -34,12 +44,13 @@ impl Tui48 {
             }
         }
 
+        self.w.execute(LeaveAlternateScreen)?;
         terminal::disable_raw_mode()?;
         Ok(())
     }
 }
 
-impl Tui48 {
+impl<T: Write> Tui48<T> {
     fn shift(&mut self, direction: Direction) -> Result<()> {
         if let Some(hint) = self.board.shift(direction) {}
         Ok(())

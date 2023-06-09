@@ -1,3 +1,5 @@
+use std::io::stdout;
+
 use rand::thread_rng;
 
 mod board;
@@ -12,7 +14,8 @@ use tui::Tui48;
 fn main() -> Result<()> {
     let rng = thread_rng();
     let board = Board::new(rng);
-    let tui48 = Tui48::new(board);
+    let w = stdout().lock();
+    let tui48 = Tui48::new(board, Box::new(w));
 
     tui48.run()
 }
