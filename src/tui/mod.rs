@@ -12,8 +12,6 @@ use crossterm::{
 use crate::board::{Board, Direction};
 use crate::error::Result;
 
-pub(crate) mod widget;
-
 enum Event {
     UserInput(UserInput),
 }
