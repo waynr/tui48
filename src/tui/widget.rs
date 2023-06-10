@@ -6,6 +6,13 @@ use crate::round::{Card, Round};
 
 pub(crate) struct Bounds(u16, u16);
 
+impl Add for Bounds {
+    type Output = Self;
+    fn add(self, other: Self) -> Self::Output {
+        Self(self.0 + other.0, self.1 + other.1)
+    }
+}
+
 pub(crate) enum SizeHint {
     Unknown,
     MinBounds(Bounds),
@@ -27,18 +34,19 @@ pub(crate) trait Widget<W: Write> {
 
 impl<W: Write> Widget<W> for Board {
     fn draw(&self, w: W, b: Bounds) -> Result<Bounds> {
-        Ok(Bounds(0,0))
+        let current_round = self.current();
+        Ok(current_round.draw(w, b)?)
     }
 }
 
 impl<W: Write> Widget<W> for Round {
     fn draw(&self, w: W, b: Bounds) -> Result<Bounds> {
-        Ok(Bounds(0,0))
+        Ok(Bounds(0, 0))
     }
 }
 
 impl<W: Write> Widget<W> for Card {
     fn draw(&self, w: W, b: Bounds) -> Result<Bounds> {
-        Ok(Bounds(0,0))
+        Ok(Bounds(0, 0))
     }
 }
