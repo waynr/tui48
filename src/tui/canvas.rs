@@ -5,13 +5,31 @@ use crate::error::{Error, Result};
 
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
 #[derive(Clone, Default)]
-pub(crate) struct Idx(usize, usize, usize);
+pub(crate) struct Idx(pub usize, pub usize, pub usize);
 
 #[derive(Clone, Default)]
-pub(crate) struct Bounds2D(usize, usize);
+pub(crate) struct Bounds2D(pub usize, pub usize);
 
 #[derive(Clone, Default)]
-pub(crate) struct Rectangle(Idx, Bounds2D);
+pub(crate) struct Rectangle(pub Idx, pub Bounds2D);
+
+impl Rectangle {
+    fn width(&self) -> usize {
+        self.1 .0
+    }
+
+    fn height(&self) -> usize {
+        self.1 .1
+    }
+
+    fn x(&self) -> usize {
+        self.0 .0
+    }
+
+    fn y(&self) -> usize {
+        self.0 .1
+    }
+}
 
 /// A 2d grid of `Cell`s.
 pub(crate) struct Canvas {
@@ -45,19 +63,33 @@ impl Canvas {
     }
 
     pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
-        let mut buf = DrawBuffer::new(r.clone());
-        for (y, row) in self.grid.iter_mut().enumerate().skip(r.0.1).take(r.1.1) {
-            for (x, cellstack) in row.iter_mut().enumerate().skip(r.0.0).take(r.1.0) {
-                let idx = Idx(x, y, r.0.2);
-                let tuxel = cellstack.acquire(idx.clone(), Some(buf.clone()))?;
-                buf.insert(&idx, tuxel)?;
+        let buf = DrawBuffer::new(r.clone());
+        for (buf_y, (y, row)) in self
+            .grid
+            .iter_mut()
+            .enumerate()
+            .skip(r.y())
+            .take(r.height())
+            .enumerate()
+        {
+            for (buf_x, (x, cellstack)) in row
+                .iter_mut()
+                .enumerate()
+                .skip(r.x())
+                .take(r.width())
+                .enumerate()
+            {
+                let canvas_idx = Idx(x, y, r.0 .2);
+                let buf_idx = Idx(buf_x, buf_y, r.0 .2);
+                let tuxel = cellstack.acquire(canvas_idx, Some(buf.clone()))?;
+                buf.insert(&buf_idx, tuxel)?;
             }
         }
         Ok(buf)
     }
 
     pub(crate) fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
-        self.get_draw_buffer(Rectangle(Idx(0,0,z), self.rectangle.1.clone()))
+        self.get_draw_buffer(Rectangle(Idx(0, 0, z), self.rectangle.1.clone()))
     }
 
     pub(crate) fn draw_all(&mut self) -> Result<()> {
@@ -267,11 +299,10 @@ pub(crate) struct DrawBuffer {
 
 impl DrawBuffer {
     fn new(rectangle: Rectangle) -> Self {
-        let Bounds2D(width, height) = rectangle.1;
-        let mut buf: Vec<_> = Vec::with_capacity(height);
-        for _ in 0..height {
-            let mut row: Vec<Tuxel> = Vec::with_capacity(width);
-            for _ in 0..width {
+        let mut buf: Vec<_> = Vec::with_capacity(rectangle.height());
+        for _ in 0..rectangle.height() {
+            let mut row: Vec<Tuxel> = Vec::with_capacity(rectangle.width());
+            for _ in 0..rectangle.width() {
                 row.push(Tuxel::default())
             }
             buf.push(row);
@@ -297,9 +328,9 @@ impl DrawBuffer {
         let current = inner
             .buf
             .get_mut(idx.1)
-            .ok_or(Error::OutOfBounds)?
+            .ok_or(Error::OutOfBoundsY(idx.1))?
             .get_mut(idx.0)
-            .ok_or(Error::OutOfBounds)?;
+            .ok_or(Error::OutOfBoundsX(idx.0))?;
         match current.inner {
             Some(_) => Err(String::from("DrawBuffer tuxel slot already occupied").into()),
             None => {
@@ -331,4 +362,79 @@ pub(crate) enum Modifier {
     ForegroundColor(u8, u8, u8),
     BackgroundColor(u8, u8, u8),
     Bold,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case::base((5, 5))]
+    #[case::realistic((274, 75))]
+    //#[case::toobig((1000, 1000))]
+    fn canvas_size(#[case] dims: (usize, usize)) {
+        let canvas = Canvas::new(dims.0, dims.1);
+        assert_eq!(canvas.grid.len(), dims.1);
+        for row in &canvas.grid {
+            assert_eq!(row.len(), dims.0);
+        }
+    }
+
+    #[rstest]
+    #[case::base((5, 5))]
+    #[case::realistic((274, 75))]
+    fn get_layer_validate_draw_buffer_size(#[case] dims: (usize, usize)) {
+        let mut canvas = Canvas::new(dims.0, dims.1);
+        let result = canvas.get_layer(0);
+        assert!(result.is_ok());
+        let buffer = result.unwrap();
+        let inner = buffer.inner.lock().unwrap();
+        assert_eq!(inner.buf.len(), dims.1);
+        for row in &inner.buf {
+            assert_eq!(row.len(), dims.0);
+        }
+    }
+
+    fn rectangle(x: usize, y: usize, z: usize, width: usize, height: usize) -> Rectangle {
+        Rectangle(Idx(x, y, z), Bounds2D(width, height))
+    }
+
+    #[rstest]
+    #[case::base((5, 5), rectangle(0, 0, 0, 5, 5))]
+    #[case::realistic((274, 75), rectangle(0, 0, 0, 274, 75))]
+    #[case::realistic_smaller_buffer((274, 75), rectangle(10, 10, 0, 10, 10))]
+    fn validate_get_draw_buffer(
+        #[case] canvas_dims: (usize, usize),
+        #[case] rect: Rectangle,
+    ) -> Result<()> {
+        let mut canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
+        let buffer = canvas.get_draw_buffer(rect.clone())?;
+
+        let inner = buffer.inner.lock().unwrap();
+        assert_eq!(
+            inner.buf.len(),
+            rect.height(),
+            "validating height of draw buffer"
+        );
+        for row in &inner.buf {
+            assert_eq!(row.len(), rect.width(), "validating width of draw buffer");
+        }
+
+        Ok(())
+    }
+
+    #[rstest]
+    #[case::base(rectangle(0, 0, 0, 5, 5))]
+    #[case::asymmetric(rectangle(0, 0, 0, 274, 75))]
+    #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
+    fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
+        let buf = DrawBuffer::new(rect.clone());
+        let inner = buf.inner.lock().unwrap();
+        assert_eq!(inner.buf.len(), rect.height());
+        for row in &inner.buf {
+            assert_eq!(row.len(), rect.width());
+        }
+        Ok(())
+    }
 }
