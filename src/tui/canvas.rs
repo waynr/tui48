@@ -1,5 +1,5 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, Result};
 
@@ -69,7 +69,7 @@ impl Canvas {
         Ok(())
     }
 
-    fn translate_tuxels(&mut self, ts: Vec<Arc<RwLock<Tuxel>>>) -> Result<()> {
+    fn translate_tuxels(&mut self, ts: Vec<Arc<Mutex<Tuxel>>>) -> Result<()> {
         Err(String::from("not implemented").into())
     }
 }
@@ -88,7 +88,7 @@ impl Iterator for &Canvas {
 }
 
 /// A stack of `Cells`. Enables z-ordering of elements with occlusion and update detection. Tuxels
-/// are wrapped in a Arc<RwLock<_>> to allow them to be referenced by the higher level Widget
+/// are wrapped in a Arc<Mutex<_>> to allow them to be referenced by the higher level Widget
 /// abstraction at the same time.
 #[derive(Default)]
 struct StackInner {
@@ -98,13 +98,13 @@ struct StackInner {
 
 #[derive(Clone, Default)]
 struct Stack {
-    inner: Arc<RwLock<StackInner>>,
+    inner: Arc<Mutex<StackInner>>,
 }
 
 impl Stack {
     fn acquire(&mut self, idx: Idx, buf: Option<DrawBuffer>) -> Result<Tuxel> {
         let clone = self.inner.clone();
-        let mut inner = clone.write().expect("lock unexpectedly poisoned");
+        let mut inner = clone.lock().expect("lock unexpectedly poisoned");
         let tuxel = &mut inner.cells[idx.2];
         match tuxel.inner {
             Some(_) => Err(String::from("tuxel already occupied!").into()),
@@ -118,7 +118,7 @@ impl Stack {
 
     fn top(&self) -> Result<Tuxel> {
         let cloned = self.inner.clone();
-        let readable = cloned.read().expect("lock unexpectedly poisoned");
+        let readable = cloned.lock().expect("lock unexpectedly poisoned");
 
         Ok(readable
             .cells
@@ -148,7 +148,7 @@ struct TuxelInner {
 
 #[derive(Clone, Default)]
 pub(crate) struct Tuxel {
-    inner: Option<Arc<RwLock<TuxelInner>>>,
+    inner: Option<Arc<Mutex<TuxelInner>>>,
 }
 
 impl std::fmt::Display for Tuxel {
@@ -161,7 +161,7 @@ impl std::fmt::Display for Tuxel {
             f,
             "{}",
             inner
-                .read()
+                .lock()
                 .expect("TODO: handle thread panicking better than this")
                 .content
         )?;
@@ -172,7 +172,7 @@ impl std::fmt::Display for Tuxel {
 impl Tuxel {
     fn new(idx: Idx, buf: Option<DrawBuffer>) -> Self {
         Tuxel {
-            inner: Some(Arc::new(RwLock::new(TuxelInner {
+            inner: Some(Arc::new(Mutex::new(TuxelInner {
                 // use radioactive symbol to indicate user hasn't set a value for this Tuxel.
                 //content: '\u{2622}',
                 content: 'x',
@@ -197,13 +197,13 @@ impl Tuxel {
             None => return Vec::new(),
         };
         let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &inner
-            .read()
+            .lock()
             .expect("TODO: handle thread panicking better than this")
             .partof
         {
             parent
                 .inner
-                .read()
+                .lock()
                 .expect("TOOD: handle thread panicking better than this")
                 .before_modifiers
                 .iter()
@@ -213,7 +213,7 @@ impl Tuxel {
             Vec::new()
         };
         let mut modifiers: Vec<Modifier> = inner
-            .read()
+            .lock()
             .expect("TODO: handle thread panicking better than this")
             .before_modifiers
             .clone();
@@ -227,13 +227,13 @@ impl Tuxel {
             None => return Vec::new(),
         };
         let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &inner
-            .read()
+            .lock()
             .expect("TODO: handle thread panicking better than this")
             .partof
         {
             parent
                 .inner
-                .read()
+                .lock()
                 .expect("TODO: handle thread panicking better than this")
                 .after_modifiers
                 .iter()
@@ -243,7 +243,7 @@ impl Tuxel {
             Vec::new()
         };
         let mut modifiers: Vec<Modifier> = inner
-            .read()
+            .lock()
             .expect("TODO: handle thread panicking better than this")
             .after_modifiers
             .clone();
@@ -262,7 +262,7 @@ struct DrawBufferInner {
 
 #[derive(Clone, Default)]
 pub(crate) struct DrawBuffer {
-    inner: Arc<RwLock<DrawBufferInner>>,
+    inner: Arc<Mutex<DrawBufferInner>>,
 }
 
 impl DrawBuffer {
@@ -277,7 +277,7 @@ impl DrawBuffer {
             buf.push(row);
         }
         Self {
-            inner: Arc::new(RwLock::new(DrawBufferInner {
+            inner: Arc::new(Mutex::new(DrawBufferInner {
                 rectangle,
                 buf,
                 before_modifiers: Vec::new(),
@@ -292,7 +292,7 @@ impl DrawBuffer {
             .expect("tuxel to be inserted must always be some");
         let mut inner = self
             .inner
-            .write()
+            .lock()
             .expect("TODO: handle thread panicking better than this");
         let current = inner
             .buf
@@ -312,7 +312,7 @@ impl DrawBuffer {
     pub(crate) fn modify_before(&mut self, modifier: Modifier) {
         let mut inner = self
             .inner
-            .write()
+            .lock()
             .expect("TODO: handle thread panicking better than this");
         inner.before_modifiers.push(modifier)
     }
@@ -320,7 +320,7 @@ impl DrawBuffer {
     pub(crate) fn modify_after(&mut self, modifier: Modifier) {
         let mut inner = self
             .inner
-            .write()
+            .lock()
             .expect("TODO: handle thread panicking better than this");
         inner.after_modifiers.push(modifier)
     }
