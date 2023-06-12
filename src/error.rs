@@ -1,2 +1,10 @@
+use thiserror;
+
 /// The Result type for tui48.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("out of bounds error")]
+    OutOfBounds,
+}

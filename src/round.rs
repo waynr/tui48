@@ -30,15 +30,17 @@ impl AnimationHint {
 
 pub(crate) type Card = u16;
 
+pub(crate) type Score = u16;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Round {
     slots: [[Card; 4]; 4],
-    score: u16,
+    score: Score,
 }
 
 // public methods
 impl Round {
-    pub(crate) fn score(&self) -> u16 {
+    pub(crate) fn score(&self) -> Score {
         self.score
     }
 
@@ -65,7 +67,7 @@ impl Round {
         Indices::new(self, direction)
     }
 
-    fn get(&self, idx: &Idx) -> u16 {
+    fn get(&self, idx: &Idx) -> Card {
         *self
             .slots
             .get(idx.1)
@@ -74,7 +76,7 @@ impl Round {
             .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
 
-    fn get_mut(&mut self, idx: &Idx) -> &mut u16 {
+    fn get_mut(&mut self, idx: &Idx) -> &mut Card {
         self.slots
             .get_mut(idx.1)
             .expect(format!("invalid y coordinate {}", idx.1).as_str())
@@ -82,7 +84,7 @@ impl Round {
             .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
 
-    fn set(&mut self, idx: &Idx, value: u16) {
+    fn set(&mut self, idx: &Idx, value: Card) {
         let rf = self.get_mut(idx);
         *rf = value;
     }
@@ -323,8 +325,8 @@ mod test {
     )]
     fn shift(
         #[case] direction: Direction,
-        #[case] initial: [[u16; 4]; 4],
-        #[case] expected: [[u16; 4]; 4],
+        #[case] initial: [[Card; 4]; 4],
+        #[case] expected: [[Card; 4]; 4],
     ) {
         let initial = Round {
             score: 0,
@@ -341,7 +343,7 @@ mod test {
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 
-    fn round(slots: [[u16; 4]; 4], score: u16) -> Round {
+    fn round(slots: [[Card; 4]; 4], score: Score) -> Round {
         Round { score, slots }
     }
 

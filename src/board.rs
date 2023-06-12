@@ -1,6 +1,6 @@
 use rand::rngs::ThreadRng;
 
-use crate::round::{AnimationHint, Round};
+use crate::round::{AnimationHint, Round, Score};
 
 /// Direction represents the direction indicated by the player.
 #[derive(Clone, Debug, Default)]
@@ -26,7 +26,7 @@ impl Board {
         Self { rng, rounds }
     }
 
-    fn score(&self) -> u16 {
+    fn score(&self) -> Score {
         self.rounds.last().map_or(0, |r| r.score())
     }
 
@@ -46,7 +46,7 @@ impl Board {
         hint
     }
 
-    pub(crate) fn current(&mut self) -> Option<&Round> {
-        self.rounds.last()
+    pub(crate) fn current(&self) -> &Round {
+        self.rounds.last().expect("a board must always have at least one round")
     }
 }

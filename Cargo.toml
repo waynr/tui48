@@ -9,6 +9,7 @@ edition = "2021"
 
 crossterm = "0.26"
 rand = "0.8.5"
+thiserror = "1.0"
 
 [dev-dependencies]
 
