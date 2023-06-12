@@ -1,5 +1,5 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::error::{Error, Result};
 
@@ -183,30 +183,79 @@ pub(crate) struct Tuxel {
     inner: Option<Arc<Mutex<TuxelInner>>>,
 }
 
-impl std::fmt::Display for Tuxel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let inner = match &self.inner {
-            Some(inner) => inner,
-            None => return Ok(()),
+pub(crate) struct TuxelGuard<'a> {
+    inner: MutexGuard<'a, TuxelInner>,
+}
+
+impl<'a> TuxelGuard<'a> {
+    pub(crate) fn set_content(&mut self, c: char) {
+        self.inner.content = c;
+    }
+
+    pub(crate) fn coordinates(&self) -> (usize, usize) {
+        (self.inner.idx.0, self.inner.idx.1)
+    }
+
+    pub(crate) fn before(&self) -> Vec<Modifier> {
+        let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &self.inner.partof {
+            parent
+                .inner
+                .lock()
+                .expect("TOOD: handle thread panicking better than this")
+                .before_modifiers
+                .iter()
+                .map(|m| m.clone())
+                .collect()
+        } else {
+            Vec::new()
         };
-        write!(
-            f,
-            "{}",
-            inner
+        let mut modifiers: Vec<Modifier> = self.inner.before_modifiers.clone();
+        parent_modifiers.append(&mut modifiers);
+        parent_modifiers
+    }
+
+    pub(crate) fn after(&self) -> Vec<Modifier> {
+        let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &self.inner.partof {
+            parent
+                .inner
                 .lock()
                 .expect("TODO: handle thread panicking better than this")
-                .content
-        )?;
+                .after_modifiers
+                .iter()
+                .map(|m| m.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let mut modifiers: Vec<Modifier> = self.inner.after_modifiers.clone();
+        parent_modifiers.append(&mut modifiers);
+        parent_modifiers
+    }
+}
+
+impl std::fmt::Display for TuxelGuard<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner.content)?;
         Ok(())
     }
 }
 
-impl Tuxel {
+impl std::fmt::Display for Tuxel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(guard) = self.clone().lock() {
+            guard.fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'a> Tuxel {
     fn new(idx: Idx, buf: Option<DrawBuffer>) -> Self {
         Tuxel {
             inner: Some(Arc::new(Mutex::new(TuxelInner {
                 // use radioactive symbol to indicate user hasn't set a value for this Tuxel.
                 //content: '\u{2622}',
+                //content: '\u{2566}',
                 content: 'x',
                 idx,
                 before_modifiers: Vec::new(),
@@ -223,64 +272,13 @@ impl Tuxel {
         };
     }
 
-    pub(crate) fn before(&self) -> Vec<Modifier> {
-        let inner = match &self.inner {
-            Some(inner) => inner,
-            None => return Vec::new(),
-        };
-        let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this")
-            .partof
-        {
-            parent
-                .inner
-                .lock()
-                .expect("TOOD: handle thread panicking better than this")
-                .before_modifiers
-                .iter()
-                .map(|m| m.clone())
-                .collect()
-        } else {
-            Vec::new()
-        };
-        let mut modifiers: Vec<Modifier> = inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this")
-            .before_modifiers
-            .clone();
-        parent_modifiers.append(&mut modifiers);
-        parent_modifiers
-    }
-
-    pub(crate) fn after(&self) -> Vec<Modifier> {
-        let inner = match &self.inner {
-            Some(inner) => inner,
-            None => return Vec::new(),
-        };
-        let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this")
-            .partof
-        {
-            parent
-                .inner
-                .lock()
-                .expect("TODO: handle thread panicking better than this")
-                .after_modifiers
-                .iter()
-                .map(|m| m.clone())
-                .collect()
-        } else {
-            Vec::new()
-        };
-        let mut modifiers: Vec<Modifier> = inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this")
-            .after_modifiers
-            .clone();
-        parent_modifiers.append(&mut modifiers);
-        parent_modifiers
+    pub(crate) fn lock(&'a mut self) -> Option<TuxelGuard<'a>> {
+        self.inner
+            .as_ref()
+            .map(|v| v.lock())
+            .transpose()
+            .expect("")
+            .map(|v| TuxelGuard { inner: v })
     }
 }
 

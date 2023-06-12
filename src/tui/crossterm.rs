@@ -40,14 +40,17 @@ impl<T: Write> Renderer for Crossterm<T> {
         self.w.queue(cursor::SavePosition)?;
         self.w.queue(style::ResetColor)?;
         for result in c {
-            let tuxel = result?;
-            for command in tuxel.before().iter() {
-                self.queue(command)?;
-            }
-            self.w.queue(style::Print(&tuxel))?;
-            for command in tuxel.after().iter() {
-                self.queue(command)?;
-            }
+            if let Some(tuxel) = result?.lock() {
+                for command in tuxel.before().iter() {
+                    self.queue(command)?;
+                }
+                let (x, y) = tuxel.coordinates();
+                self.w.queue(cursor::MoveTo(x as u16, y as u16))?;
+                self.w.queue(style::Print(format!("{}", &tuxel)))?;
+                for command in tuxel.after().iter() {
+                    self.queue(command)?;
+                }
+            };
         }
         self.w.queue(cursor::RestorePosition)?;
         self.w.queue(terminal::EndSynchronizedUpdate)?;
@@ -60,10 +63,18 @@ impl<T: Write> Crossterm<T> {
     fn queue(&mut self, m: &Modifier) -> Result<()> {
         match m {
             Modifier::BackgroundColor(r, g, b) => {
-                self.w.queue(style::SetBackgroundColor(Color::Rgb{r: *r, g: *g, b: *b}))?
+                self.w.queue(style::SetBackgroundColor(Color::Rgb {
+                    r: *r,
+                    g: *g,
+                    b: *b,
+                }))?
             }
             Modifier::ForegroundColor(r, g, b) => {
-                self.w.queue(style::SetForegroundColor(Color::Rgb{r: *r, g: *g, b: *b}))?
+                self.w.queue(style::SetForegroundColor(Color::Rgb {
+                    r: *r,
+                    g: *g,
+                    b: *b,
+                }))?
             }
             Modifier::Bold => self.w.queue(style::SetAttribute(style::Attribute::Bold))?,
         };
