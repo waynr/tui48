@@ -61,10 +61,10 @@ impl Tui48 {
         Ok(())
     }
 }
- 
+
 impl Tui48 {
-     fn shift(&mut self, direction: Direction) -> Result<()> {
-         if let Some(hint) = self.board.shift(direction) {}
-         Ok(())
-     }
+    fn shift(&mut self, direction: Direction) -> Result<()> {
+        if let Some(hint) = self.board.shift(direction) {}
+        Ok(())
+    }
 }

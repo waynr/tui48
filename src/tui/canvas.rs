@@ -368,12 +368,17 @@ impl DrawBuffer {
         let (skipx, takex, skipy, takey) = if locked.border {
             (
                 1usize,
-                locked.rectangle.1 .0 - 2,
+                locked.rectangle.width() - 2,
                 1usize,
-                locked.rectangle.1 .1 - 2,
+                locked.rectangle.height() - 2,
             )
         } else {
-            (0usize, locked.rectangle.1 .0, 0usize, locked.rectangle.1 .1)
+            (
+                0usize,
+                locked.rectangle.width(),
+                0usize,
+                locked.rectangle.height(),
+            )
         };
         for row in locked.buf.iter_mut().skip(skipy).take(takey) {
             for tuxel in row.iter_mut().skip(skipx).take(takex) {
