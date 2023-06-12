@@ -287,6 +287,7 @@ impl Tuxel {
 #[derive(Default)]
 struct DrawBufferInner {
     rectangle: Rectangle,
+    border: bool,
     buf: Vec<Vec<Tuxel>>,
     before_modifiers: Vec<Modifier>,
     after_modifiers: Vec<Modifier>,
@@ -310,6 +311,7 @@ impl DrawBuffer {
         Self {
             inner: Arc::new(Mutex::new(DrawBufferInner {
                 rectangle,
+                border: false,
                 buf,
                 before_modifiers: Vec::new(),
                 after_modifiers: Vec::new(),
@@ -354,6 +356,35 @@ impl DrawBuffer {
             .lock()
             .expect("TODO: handle thread panicking better than this");
         inner.after_modifiers.push(modifier)
+    }
+
+    pub(crate) fn draw_border(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    pub(crate) fn fill(&mut self, c: char) -> Result<()> {
+        let inner = self.inner.clone();
+        let mut locked = inner
+            .lock()
+            .expect("TODO: handle thread panicking better than this");
+        let (skipx, takex, skipy, takey) = if locked.border {
+            (
+                1usize,
+                locked.rectangle.1 .0 - 2,
+                1usize,
+                locked.rectangle.1 .1 - 2,
+            )
+        } else {
+            (0usize, locked.rectangle.1 .0, 0usize, locked.rectangle.1 .1)
+        };
+        for row in locked.buf.iter_mut().skip(skipy).take(takey) {
+            for tuxel in row.iter_mut().skip(skipx).take(takex) {
+                if let Some(mut tuxel) = tuxel.lock() {
+                    tuxel.set_content(c);
+                }
+            }
+        }
+        Ok(())
     }
 }
 

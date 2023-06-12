@@ -4,11 +4,9 @@ use crate::board::{Board, Direction};
 use crate::error::Result;
 
 mod canvas;
-use canvas::{Canvas, Modifier};
+use canvas::{Bounds2D, Canvas, Idx, Modifier, Rectangle};
 mod crossterm;
-use crate::tui::crossterm::{
-    Crossterm, size, next_event,
-};
+use crate::tui::crossterm::{next_event, size, Crossterm};
 
 pub(crate) trait Renderer {
     fn render(&mut self, c: &Canvas) -> Result<()>;
@@ -44,6 +42,10 @@ impl Tui48 {
         let mut buf = self.canvas.get_layer(0)?;
         buf.modify_before(Modifier::ForegroundColor(0, 0, 0));
         buf.modify_before(Modifier::BackgroundColor(150, 150, 150));
+        let mut small = self
+            .canvas
+            .get_draw_buffer(Rectangle(Idx(2, 5, 2), Bounds2D(20, 6)))?;
+        small.fill('o')?;
         self.renderer.render(&self.canvas)?;
         //self.initialize_terminal()?;
         //self.draw_board()?;
