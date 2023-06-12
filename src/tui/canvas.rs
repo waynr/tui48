@@ -45,19 +45,19 @@ impl Canvas {
     }
 
     pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
-        Err(String::from("not implemented").into())
-    }
-
-    pub(crate) fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
-        let mut buf = DrawBuffer::new(self.rectangle.clone());
-        for (y, row) in self.grid.iter_mut().enumerate() {
-            for (x, cellstack) in row.iter_mut().enumerate() {
-                let idx = Idx(x, y, z);
+        let mut buf = DrawBuffer::new(r.clone());
+        for (y, row) in self.grid.iter_mut().enumerate().skip(r.0.1).take(r.1.1) {
+            for (x, cellstack) in row.iter_mut().enumerate().skip(r.0.0).take(r.1.0) {
+                let idx = Idx(x, y, r.0.2);
                 let tuxel = cellstack.acquire(idx.clone(), Some(buf.clone()))?;
                 buf.insert(&idx, tuxel)?;
             }
         }
         Ok(buf)
+    }
+
+    pub(crate) fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
+        self.get_draw_buffer(Rectangle(Idx(0,0,z), self.rectangle.1.clone()))
     }
 
     pub(crate) fn draw_all(&mut self) -> Result<()> {
@@ -173,8 +173,9 @@ impl Tuxel {
     fn new(idx: Idx, buf: Option<DrawBuffer>) -> Self {
         Tuxel {
             inner: Some(Arc::new(RwLock::new(TuxelInner {
-                content: '\u{2662}', // use radioactive symbol to indicate user hasn't set a value
-                // for this Tuxel.
+                // use radioactive symbol to indicate user hasn't set a value for this Tuxel.
+                //content: '\u{2622}',
+                content: 'x',
                 idx,
                 before_modifiers: Vec::new(),
                 after_modifiers: Vec::new(),

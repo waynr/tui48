@@ -43,7 +43,7 @@ impl Tui48 {
     pub(crate) fn run(mut self) -> Result<()> {
         let mut buf = self.canvas.get_layer(0)?;
         buf.modify_before(Modifier::ForegroundColor(0, 0, 0));
-        buf.modify_before(Modifier::BackgroundColor(88, 88, 88));
+        buf.modify_before(Modifier::BackgroundColor(150, 150, 150));
         self.renderer.render(&self.canvas)?;
         //self.initialize_terminal()?;
         //self.draw_board()?;
