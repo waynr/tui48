@@ -22,12 +22,6 @@ pub(crate) enum UserInput {
     Quit,
 }
 
-struct Tui48BoardDimensions {
-    padding: u16,
-    height: u16,
-    width: u16,
-}
-
 struct Tui48Board {
     board: DrawBuffer,
     score: DrawBuffer,
