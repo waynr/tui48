@@ -28,6 +28,7 @@ struct Tui48Board {
     slots: Vec<Vec<Option<DrawBuffer>>>,
 }
 
+/// Generates a 2048 TUI layout with legible numbers.
 ///
 ///  37
 ///  ╔══════════════════════════════════╗
@@ -62,7 +63,6 @@ struct Tui48Board {
 ///
 ///
 ///
-
 impl Tui48Board {
     fn new(game: &Board, canvas: &mut Canvas) -> Result<Self> {
         let mut board = canvas.get_draw_buffer(Rectangle(Idx(5, 5, 0), Bounds2D(36, 25)))?;
