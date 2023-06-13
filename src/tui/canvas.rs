@@ -29,6 +29,22 @@ impl Rectangle {
     fn y(&self) -> usize {
         self.0 .1
     }
+
+    fn relative_idx(&self, pos: &Position) -> (usize, usize) {
+        match pos {
+            Position::TopLeft => (0, 0),
+            Position::TopRight => (self.width() - 1, 0),
+            Position::BottomLeft => (0, self.height() - 1),
+            Position::BottomRight => (self.width() - 1, self.height() - 1),
+        }
+    }
+}
+
+pub(crate) enum Position {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
 }
 
 /// A 2d grid of `Cell`s.
@@ -345,7 +361,7 @@ impl DrawBuffer {
     }
 
     pub(crate) fn draw_border(&mut self) -> Result<()> {
-        Ok(())
+        self.lock().draw_border()
     }
 
     pub(crate) fn fill(&mut self, c: char) -> Result<()> {
@@ -392,6 +408,107 @@ impl<'a> DrawBufferGuard<'a> {
             }
         }
         Ok(())
+    }
+
+    pub(crate) fn draw_border(&mut self) -> Result<()> {
+        let box_corner = boxy::Char::upper_left(boxy::Weight::Doubled);
+        let box_horizontal = boxy::Char::horizontal(boxy::Weight::Doubled);
+        let box_vertical = boxy::Char::vertical(boxy::Weight::Doubled);
+        if self.inner.buf.len() < 2 {
+            // can only draw a border if there are at least two rows
+            return Ok(());
+        }
+
+        // draw corners
+        if let Some(mut t) = self.get_tuxel(Position::TopLeft).lock() {
+            t.set_content(box_corner.clone().into());
+        };
+        if let Some(mut t) = self.get_tuxel(Position::TopRight).lock() {
+            t.set_content(box_corner.clone().rotate_cw(1).into());
+        };
+        if let Some(mut t) = self.get_tuxel(Position::BottomRight).lock() {
+            t.set_content(box_corner.clone().rotate_cw(2).into());
+        };
+        if let Some(mut t) = self.get_tuxel(Position::BottomLeft).lock() {
+            t.set_content(box_corner.clone().rotate_ccw(1).into());
+        };
+
+        // draw non-corner top
+        for tuxel in self
+            .inner
+            .buf
+            .iter()
+            .nth(0)
+            .expect("drawbuffer rows are always populated")
+            .iter()
+            .skip(1)
+            .take(self.inner.rectangle.width() - 2)
+        {
+            if let Some(mut t) = tuxel.clone().lock() {
+                t.set_content(box_horizontal.clone().into());
+            }
+        }
+
+        // draw non-corner bottom
+        for tuxel in self
+            .inner
+            .buf
+            .iter()
+            .nth(self.inner.rectangle.height() - 1)
+            .expect("drawbuffer rows are always populated")
+            .iter()
+            .skip(1)
+            .take(self.inner.rectangle.width() - 2)
+        {
+            if let Some(mut t) = tuxel.clone().lock() {
+                t.set_content(box_horizontal.clone().into());
+            }
+        }
+
+        // draw non-corner sides
+        for row in self
+            .inner
+            .buf
+            .iter()
+            // skip the first row
+            .skip(1)
+            // skip the last row
+            .take(self.inner.rectangle.height() - 2)
+        {
+            if let Some(mut t) = row
+                .iter()
+                .nth(0)
+                .expect("drawbuffer rows are always populated")
+                .clone()
+                .lock()
+            {
+                t.set_content(box_vertical.clone().into());
+            }
+            if let Some(mut t) = row
+                .iter()
+                .nth(self.inner.rectangle.width() - 1)
+                .expect("drawbuffer rows are always populated")
+                .clone()
+                .lock()
+            {
+                t.set_content(box_vertical.clone().into());
+            }
+        }
+
+        self.inner.border = true;
+
+        Ok(())
+    }
+
+    fn get_tuxel(&mut self, pos: Position) -> Tuxel {
+        let (x, y) = self.inner.rectangle.relative_idx(&pos);
+        self.inner
+            .buf
+            .get(y)
+            .map(|row| row.get(x))
+            .flatten()
+            .map(|t| t.clone())
+            .expect("using the buffer's rectangle should always yield a tuxel")
     }
 }
 

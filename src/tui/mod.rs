@@ -45,6 +45,7 @@ impl Tui48 {
         let mut small = self
             .canvas
             .get_draw_buffer(Rectangle(Idx(2, 5, 2), Bounds2D(20, 6)))?;
+        small.draw_border()?;
         small.fill(' ')?;
         self.renderer.render(&self.canvas)?;
         //self.initialize_terminal()?;
