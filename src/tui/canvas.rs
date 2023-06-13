@@ -125,7 +125,6 @@ impl Iterator for &Canvas {
 #[derive(Default)]
 struct StackInner {
     cells: [Tuxel; 8],
-    top_index: usize,
 }
 
 #[derive(Clone, Default)]
@@ -277,7 +276,7 @@ impl<'a> Tuxel {
             .as_ref()
             .map(|v| v.lock())
             .transpose()
-            .expect("")
+            .expect("TODO: handle thread panicking better than this")
             .map(|v| TuxelGuard { inner: v })
     }
 }
