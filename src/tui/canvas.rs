@@ -364,6 +364,28 @@ impl DrawBuffer {
     pub(crate) fn fill(&mut self, c: char) -> Result<()> {
         self.lock().fill(c)
     }
+
+    pub(crate) fn write(&mut self, s: &str) -> Result<()> {
+        let mut guard = self.lock();
+        let y = guard.inner.rectangle.height() / 2;
+        let x = if guard.inner.border {
+            guard.inner.rectangle.width() - 2
+        } else {
+            guard.inner.rectangle.width() - 1
+        };
+        for (offset, c) in s.chars().rev().enumerate() {
+            if offset > x + 1 {
+                // can't write more than width of buffer
+                break;
+            }
+            let mut tuxel = guard.get_tuxel(Position::Idx(x - offset, y));
+            let mut tguard = tuxel
+                .lock()
+                .expect("TODO: handle None case of Tuxel in DrawBuffer");
+            tguard.set_content(c);
+        }
+        Ok(())
+    }
 }
 
 impl<'a> DrawBuffer {
