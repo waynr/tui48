@@ -47,6 +47,11 @@ impl Tui48 {
             .get_draw_buffer(Rectangle(Idx(2, 5, 2), Bounds2D(20, 6)))?;
         small.draw_border()?;
         small.fill(' ')?;
+        let mut overlapping_small = self
+            .canvas
+            .get_draw_buffer(Rectangle(Idx(10, 3, 3), Bounds2D(20, 30)))?;
+        overlapping_small.draw_border()?;
+        overlapping_small.fill('o')?;
         self.renderer.render(&self.canvas)?;
         //self.initialize_terminal()?;
         //self.draw_board()?;
