@@ -36,6 +36,7 @@ impl Rectangle {
             Position::TopRight => (self.width() - 1, 0),
             Position::BottomLeft => (0, self.height() - 1),
             Position::BottomRight => (self.width() - 1, self.height() - 1),
+            Position::Idx(x, y) => (*x, *y),
         }
     }
 }
@@ -45,6 +46,7 @@ pub(crate) enum Position {
     TopRight,
     BottomLeft,
     BottomRight,
+    Idx(usize, usize),
 }
 
 /// A 2d grid of `Cell`s.
@@ -228,6 +230,10 @@ impl<'a> TuxelGuard<'a> {
         parent_modifiers
     }
 
+    fn clear(&mut self) {
+        self.inner.content = ' ';
+        self.inner.modifiers.clear();
+    }
 }
 
 impl std::fmt::Display for TuxelGuard<'_> {
