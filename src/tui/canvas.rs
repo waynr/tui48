@@ -320,10 +320,7 @@ impl DrawBuffer {
         let new_inner = tuxel
             .inner
             .expect("tuxel to be inserted must always be some");
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this");
+        let mut inner = self.lock().inner;
         let current = inner
             .buf
             .get_mut(idx.1)
@@ -340,19 +337,11 @@ impl DrawBuffer {
     }
 
     pub(crate) fn modify_before(&mut self, modifier: Modifier) {
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this");
-        inner.before_modifiers.push(modifier)
+        self.lock().inner.before_modifiers.push(modifier)
     }
 
     pub(crate) fn modify_after(&mut self, modifier: Modifier) {
-        let mut inner = self
-            .inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this");
-        inner.after_modifiers.push(modifier)
+        self.lock().inner.after_modifiers.push(modifier)
     }
 
     pub(crate) fn draw_border(&mut self) -> Result<()> {
@@ -360,26 +349,42 @@ impl DrawBuffer {
     }
 
     pub(crate) fn fill(&mut self, c: char) -> Result<()> {
-        let inner = self.inner.clone();
-        let mut locked = inner
+        self.lock().fill(c)
+    }
+}
+
+impl<'a> DrawBuffer {
+    pub(crate) fn lock(&'a self) -> DrawBufferGuard<'a> {
+        self.inner
+            .as_ref()
             .lock()
-            .expect("TODO: handle thread panicking better than this");
-        let (skipx, takex, skipy, takey) = if locked.border {
+            .map(|v| DrawBufferGuard { inner: v })
+            .expect("TODO: handle thread panicking better than this")
+    }
+}
+
+pub(crate) struct DrawBufferGuard<'a> {
+    inner: MutexGuard<'a, DrawBufferInner>,
+}
+
+impl<'a> DrawBufferGuard<'a> {
+    pub(crate) fn fill(&mut self, c: char) -> Result<()> {
+        let (skipx, takex, skipy, takey) = if self.inner.border {
             (
                 1usize,
-                locked.rectangle.width() - 2,
+                self.inner.rectangle.width() - 2,
                 1usize,
-                locked.rectangle.height() - 2,
+                self.inner.rectangle.height() - 2,
             )
         } else {
             (
                 0usize,
-                locked.rectangle.width(),
+                self.inner.rectangle.width(),
                 0usize,
-                locked.rectangle.height(),
+                self.inner.rectangle.height(),
             )
         };
-        for row in locked.buf.iter_mut().skip(skipy).take(takey) {
+        for row in self.inner.buf.iter_mut().skip(skipy).take(takey) {
             for tuxel in row.iter_mut().skip(skipx).take(takex) {
                 if let Some(mut tuxel) = tuxel.lock() {
                     tuxel.set_content(c);
