@@ -292,6 +292,22 @@ struct DrawBufferInner {
     modifiers: Vec<Modifier>,
 }
 
+impl Drop for DrawBufferInner {
+    fn drop(&mut self) {
+        for row in self.buf.iter_mut() {
+            for mut tguard in row
+                .iter_mut()
+                .map(|t| t.lock())
+                .filter(|o| o.is_some())
+                .map(|o| o.unwrap())
+            {
+                tguard.clear();
+                tguard.inner.partof = None;
+            }
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct DrawBuffer {
     inner: Arc<Mutex<DrawBufferInner>>,
