@@ -26,7 +26,7 @@ impl Board {
         Self { rng, rounds }
     }
 
-    fn score(&self) -> Score {
+    pub(crate) fn score(&self) -> Score {
         self.rounds.last().map_or(0, |r| r.score())
     }
 
@@ -48,5 +48,9 @@ impl Board {
 
     pub(crate) fn current(&self) -> &Round {
         self.rounds.last().expect("a board must always have at least one round")
+    }
+
+    pub(crate) fn dimensions(&self) -> (usize, usize) {
+        (4, 4)
     }
 }

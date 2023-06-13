@@ -4,7 +4,7 @@ use rand::Rng;
 use crate::board::Direction;
 
 #[derive(Clone, Default)]
-struct Idx(usize, usize);
+pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
 #[derive(Default)]
 pub(crate) struct AnimationHint {
@@ -67,7 +67,7 @@ impl Round {
         Indices::new(self, direction)
     }
 
-    fn get(&self, idx: &Idx) -> Card {
+    pub(crate) fn get(&self, idx: &Idx) -> Card {
         *self
             .slots
             .get(idx.1)
