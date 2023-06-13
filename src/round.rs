@@ -46,8 +46,8 @@ impl Round {
 
     pub(crate) fn random(rng: &mut ThreadRng) -> Self {
         let mut r = Round::default();
-        let (xdx2, ydx2) = (0, 0);
         let (xdx1, ydx1) = (rng.gen_range(0..3), rng.gen_range(0..3));
+        let (xdx2, ydx2) = (rng.gen_range(0..3), rng.gen_range(0..3));
         loop {
             let (xdx2, ydx2) = (rng.gen_range(0..3), rng.gen_range(0..3));
             if (xdx1, ydx1) == (xdx2, ydx2) {
