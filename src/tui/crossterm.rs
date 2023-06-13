@@ -38,18 +38,16 @@ impl<T: Write> Renderer for Crossterm<T> {
     fn render(&mut self, c: &Canvas) -> Result<()> {
         self.w.queue(terminal::BeginSynchronizedUpdate)?;
         self.w.queue(cursor::SavePosition)?;
-        self.w.queue(style::ResetColor)?;
         for result in c {
             if let Some(tuxel) = result?.lock() {
-                for command in tuxel.before().iter() {
+                for command in tuxel.modifiers().iter() {
                     self.queue(command)?;
                 }
                 let (x, y) = tuxel.coordinates();
                 self.w.queue(cursor::MoveTo(x as u16, y as u16))?;
                 self.w.queue(style::Print(format!("{}", &tuxel)))?;
-                for command in tuxel.after().iter() {
-                    self.queue(command)?;
-                }
+                self.w.queue(style::ResetColor)?;
+                self.w.queue(style::SetAttribute(style::Attribute::Reset))?;
             };
         }
         self.w.queue(cursor::RestorePosition)?;

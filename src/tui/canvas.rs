@@ -188,8 +188,7 @@ impl Stack {
 struct TuxelInner {
     content: char,
     idx: Idx,
-    before_modifiers: Vec<Modifier>,
-    after_modifiers: Vec<Modifier>,
+    modifiers: Vec<Modifier>,
     partof: Option<DrawBuffer>,
 }
 
@@ -211,41 +210,24 @@ impl<'a> TuxelGuard<'a> {
         (self.inner.idx.0, self.inner.idx.1)
     }
 
-    pub(crate) fn before(&self) -> Vec<Modifier> {
+    pub(crate) fn modifiers(&self) -> Vec<Modifier> {
         let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &self.inner.partof {
             parent
                 .inner
                 .lock()
                 .expect("TOOD: handle thread panicking better than this")
-                .before_modifiers
+                .modifiers
                 .iter()
                 .map(|m| m.clone())
                 .collect()
         } else {
             Vec::new()
         };
-        let mut modifiers: Vec<Modifier> = self.inner.before_modifiers.clone();
+        let mut modifiers: Vec<Modifier> = self.inner.modifiers.clone();
         parent_modifiers.append(&mut modifiers);
         parent_modifiers
     }
 
-    pub(crate) fn after(&self) -> Vec<Modifier> {
-        let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &self.inner.partof {
-            parent
-                .inner
-                .lock()
-                .expect("TODO: handle thread panicking better than this")
-                .after_modifiers
-                .iter()
-                .map(|m| m.clone())
-                .collect()
-        } else {
-            Vec::new()
-        };
-        let mut modifiers: Vec<Modifier> = self.inner.after_modifiers.clone();
-        parent_modifiers.append(&mut modifiers);
-        parent_modifiers
-    }
 }
 
 impl std::fmt::Display for TuxelGuard<'_> {
@@ -273,8 +255,7 @@ impl<'a> Tuxel {
                 //content: '\u{2566}',
                 content: 'x',
                 idx,
-                before_modifiers: Vec::new(),
-                after_modifiers: Vec::new(),
+                modifiers: Vec::new(),
                 partof: buf,
             }))),
         }
@@ -302,8 +283,7 @@ struct DrawBufferInner {
     rectangle: Rectangle,
     border: bool,
     buf: Vec<Vec<Tuxel>>,
-    before_modifiers: Vec<Modifier>,
-    after_modifiers: Vec<Modifier>,
+    modifiers: Vec<Modifier>,
 }
 
 #[derive(Clone, Default)]
@@ -326,8 +306,7 @@ impl DrawBuffer {
                 rectangle,
                 border: false,
                 buf,
-                before_modifiers: Vec::new(),
-                after_modifiers: Vec::new(),
+                modifiers: Vec::new(),
             })),
         }
     }
@@ -352,12 +331,8 @@ impl DrawBuffer {
         }
     }
 
-    pub(crate) fn modify_before(&mut self, modifier: Modifier) {
-        self.lock().inner.before_modifiers.push(modifier)
-    }
-
-    pub(crate) fn modify_after(&mut self, modifier: Modifier) {
-        self.lock().inner.after_modifiers.push(modifier)
+    pub(crate) fn modify(&mut self, modifier: Modifier) {
+        self.lock().inner.modifiers.push(modifier)
     }
 
     pub(crate) fn draw_border(&mut self) -> Result<()> {

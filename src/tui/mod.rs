@@ -40,8 +40,8 @@ impl Tui48 {
     /// Run consumes the Tui48 instance and takes control of the terminal to begin gameplay.
     pub(crate) fn run(mut self) -> Result<()> {
         let mut buf = self.canvas.get_layer(0)?;
-        buf.modify_before(Modifier::ForegroundColor(0, 0, 0));
-        buf.modify_before(Modifier::BackgroundColor(150, 150, 150));
+        buf.modify(Modifier::ForegroundColor(0, 0, 0));
+        buf.modify(Modifier::BackgroundColor(150, 150, 150));
         let mut small = self
             .canvas
             .get_draw_buffer(Rectangle(Idx(2, 5, 2), Bounds2D(20, 6)))?;
