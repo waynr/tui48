@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
 #[derive(Clone, Default)]
@@ -81,7 +81,12 @@ impl Canvas {
     }
 
     pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
-        let buf = DrawBuffer::new(r.clone());
+        let mut buf: Vec<_> = Vec::with_capacity(r.height());
+        let modifiers = SharedModifiers::default();
+        for _ in 0..r.height() {
+            let mut row: Vec<Tuxel> = Vec::with_capacity(r.width());
+            buf.push(row);
+        }
         for (buf_y, (y, row)) in self
             .grid
             .iter_mut()
@@ -99,11 +104,11 @@ impl Canvas {
             {
                 let canvas_idx = Idx(x, y, r.0 .2);
                 let buf_idx = Idx(buf_x, buf_y, r.0 .2);
-                let tuxel = cellstack.acquire(canvas_idx, Some(buf.clone()))?;
-                buf.insert(&buf_idx, tuxel)?;
+                buf[buf_y][buf_x] = cellstack.acquire(canvas_idx, modifiers.clone())?;
             }
         }
-        Ok(buf)
+        let dbuf = DrawBuffer::new(r.clone(), buf, modifiers);
+        Ok(dbuf)
     }
 
     pub(crate) fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
@@ -151,18 +156,13 @@ struct Stack {
 }
 
 impl Stack {
-    fn acquire(&mut self, idx: Idx, buf: Option<DrawBuffer>) -> Result<Tuxel> {
+    fn acquire(&mut self, idx: Idx, shared_modifiers: SharedModifiers) -> Result<Tuxel> {
         let clone = self.inner.clone();
         let mut inner = clone.lock().expect("lock unexpectedly poisoned");
         let tuxel = &mut inner.cells[idx.2];
-        match tuxel.inner {
-            Some(_) => Err(String::from("tuxel already occupied!").into()),
-            None => {
-                let new = Tuxel::new(idx, buf);
-                let _ = tuxel.insert(new.clone());
-                Ok(new)
-            }
-        }
+        let mut tguard = tuxel.lock();
+        tguard.inner.shared_modifiers = shared_modifiers;
+        Ok(tuxel.clone())
     }
 
     fn top(&self) -> Result<Tuxel> {
@@ -173,7 +173,7 @@ impl Stack {
             .cells
             .iter()
             .rev()
-            .find(|t| t.inner.is_some())
+            .find(|t| t.lock().active())
             .map_or_else(
                 || {
                     readable
@@ -187,16 +187,18 @@ impl Stack {
     }
 }
 
+#[derive(Clone, Default)]
 struct TuxelInner {
+    active: bool,
     content: char,
     idx: Idx,
     modifiers: Vec<Modifier>,
-    partof: Option<DrawBuffer>,
+    shared_modifiers: SharedModifiers,
 }
 
 #[derive(Clone, Default)]
 pub(crate) struct Tuxel {
-    inner: Option<Arc<Mutex<TuxelInner>>>,
+    inner: Arc<Mutex<TuxelInner>>,
 }
 
 pub(crate) struct TuxelGuard<'a> {
@@ -205,6 +207,7 @@ pub(crate) struct TuxelGuard<'a> {
 
 impl<'a> TuxelGuard<'a> {
     pub(crate) fn set_content(&mut self, c: char) {
+        self.inner.active = true;
         self.inner.content = c;
     }
 
@@ -213,26 +216,19 @@ impl<'a> TuxelGuard<'a> {
     }
 
     pub(crate) fn modifiers(&self) -> Vec<Modifier> {
-        let mut parent_modifiers: Vec<Modifier> = if let Some(parent) = &self.inner.partof {
-            parent
-                .inner
-                .lock()
-                .expect("TOOD: handle thread panicking better than this")
-                .modifiers
-                .iter()
-                .map(|m| m.clone())
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let mut parent_modifiers= &self.inner.shared_modifiers.lock();
         let mut modifiers: Vec<Modifier> = self.inner.modifiers.clone();
         parent_modifiers.append(&mut modifiers);
-        parent_modifiers
+        parent_modifiers.to_vec()
     }
 
     fn clear(&mut self) {
         self.inner.content = ' ';
         self.inner.modifiers.clear();
+    }
+
+    pub(crate) fn active(&self) -> bool {
+        self.inner.active
     }
 }
 
@@ -245,42 +241,33 @@ impl std::fmt::Display for TuxelGuard<'_> {
 
 impl std::fmt::Display for Tuxel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(guard) = self.clone().lock() {
-            guard.fmt(f)?;
-        }
-        Ok(())
+        self.clone().lock().fmt(f)
     }
 }
 
 impl<'a> Tuxel {
-    fn new(idx: Idx, buf: Option<DrawBuffer>) -> Self {
+    fn new(idx: Idx) -> Self {
         Tuxel {
-            inner: Some(Arc::new(Mutex::new(TuxelInner {
+            inner: Arc::new(Mutex::new(TuxelInner {
                 // use radioactive symbol to indicate user hasn't set a value for this Tuxel.
                 //content: '\u{2622}',
                 //content: '\u{2566}',
+                active: false,
                 content: 'x',
                 idx,
                 modifiers: Vec::new(),
-                partof: buf,
-            }))),
+                shared_modifiers: SharedModifiers::default(),
+            })),
         }
     }
 
-    fn insert(&mut self, other: Tuxel) {
-        match other.inner {
-            Some(i) => self.inner.insert(i),
-            None => return,
-        };
-    }
-
-    pub(crate) fn lock(&'a mut self) -> Option<TuxelGuard<'a>> {
-        self.inner
-            .as_ref()
-            .map(|v| v.lock())
-            .transpose()
-            .expect("TODO: handle thread panicking better than this")
-            .map(|v| TuxelGuard { inner: v })
+    pub(crate) fn lock(&'a mut self) -> TuxelGuard<'a> {
+        TuxelGuard {
+            inner: self
+                .inner
+                .lock()
+                .expect("TODO: handle thread panicking better than this"),
+        }
     }
 }
 
@@ -289,7 +276,7 @@ struct DrawBufferInner {
     rectangle: Rectangle,
     border: bool,
     buf: Vec<Vec<Tuxel>>,
-    modifiers: Vec<Modifier>,
+    modifiers: SharedModifiers,
 }
 
 impl Drop for DrawBufferInner {
@@ -298,11 +285,9 @@ impl Drop for DrawBufferInner {
             for mut tguard in row
                 .iter_mut()
                 .map(|t| t.lock())
-                .filter(|o| o.is_some())
-                .map(|o| o.unwrap())
             {
                 tguard.clear();
-                tguard.inner.partof = None;
+                tguard.inner.shared_modifiers = SharedModifiers::default();
             }
         }
     }
@@ -314,42 +299,14 @@ pub(crate) struct DrawBuffer {
 }
 
 impl DrawBuffer {
-    fn new(rectangle: Rectangle) -> Self {
-        let mut buf: Vec<_> = Vec::with_capacity(rectangle.height());
-        for _ in 0..rectangle.height() {
-            let mut row: Vec<Tuxel> = Vec::with_capacity(rectangle.width());
-            for _ in 0..rectangle.width() {
-                row.push(Tuxel::default())
-            }
-            buf.push(row);
-        }
+    fn new(rectangle: Rectangle, buf: Vec<Vec<Tuxel>>, modifiers: SharedModifiers) -> Self {
         Self {
             inner: Arc::new(Mutex::new(DrawBufferInner {
                 rectangle,
                 border: false,
                 buf,
-                modifiers: Vec::new(),
+                modifiers,
             })),
-        }
-    }
-
-    fn insert(&self, idx: &Idx, tuxel: Tuxel) -> Result<()> {
-        let new_inner = tuxel
-            .inner
-            .expect("tuxel to be inserted must always be some");
-        let mut inner = self.lock().inner;
-        let current = inner
-            .buf
-            .get_mut(idx.1)
-            .ok_or(Error::OutOfBoundsY(idx.1))?
-            .get_mut(idx.0)
-            .ok_or(Error::OutOfBoundsX(idx.0))?;
-        match current.inner {
-            Some(_) => Err(String::from("DrawBuffer tuxel slot already occupied").into()),
-            None => {
-                let _ = current.inner.insert(new_inner);
-                Ok(())
-            }
         }
     }
 
@@ -378,11 +335,10 @@ impl DrawBuffer {
                 // can't write more than width of buffer
                 break;
             }
-            let mut tuxel = guard.get_tuxel(Position::Idx(x - offset, y));
-            let mut tguard = tuxel
+            guard
+                .get_tuxel(Position::Idx(x - offset, y))
                 .lock()
-                .expect("TODO: handle None case of Tuxel in DrawBuffer");
-            tguard.set_content(c);
+                .set_content(c);
         }
         Ok(())
     }
@@ -421,9 +377,7 @@ impl<'a> DrawBufferGuard<'a> {
         };
         for row in self.inner.buf.iter_mut().skip(skipy).take(takey) {
             for tuxel in row.iter_mut().skip(skipx).take(takex) {
-                if let Some(mut tuxel) = tuxel.lock() {
-                    tuxel.set_content(c);
-                }
+                tuxel.lock().set_content(c);
             }
         }
         Ok(())
@@ -439,18 +393,18 @@ impl<'a> DrawBufferGuard<'a> {
         }
 
         // draw corners
-        if let Some(mut t) = self.get_tuxel(Position::TopLeft).lock() {
-            t.set_content(box_corner.clone().into());
-        };
-        if let Some(mut t) = self.get_tuxel(Position::TopRight).lock() {
-            t.set_content(box_corner.clone().rotate_cw(1).into());
-        };
-        if let Some(mut t) = self.get_tuxel(Position::BottomRight).lock() {
-            t.set_content(box_corner.clone().rotate_cw(2).into());
-        };
-        if let Some(mut t) = self.get_tuxel(Position::BottomLeft).lock() {
-            t.set_content(box_corner.clone().rotate_ccw(1).into());
-        };
+        self.get_tuxel(Position::TopLeft)
+            .lock()
+            .set_content(box_corner.clone().into());
+        self.get_tuxel(Position::TopRight)
+            .lock()
+            .set_content(box_corner.clone().rotate_cw(1).into());
+        self.get_tuxel(Position::BottomRight)
+            .lock()
+            .set_content(box_corner.clone().rotate_cw(2).into());
+        self.get_tuxel(Position::BottomLeft)
+            .lock()
+            .set_content(box_corner.clone().rotate_ccw(1).into());
 
         // draw non-corner top
         for tuxel in self
@@ -463,9 +417,10 @@ impl<'a> DrawBufferGuard<'a> {
             .skip(1)
             .take(self.inner.rectangle.width() - 2)
         {
-            if let Some(mut t) = tuxel.clone().lock() {
-                t.set_content(box_horizontal.clone().into());
-            }
+            tuxel
+                .clone()
+                .lock()
+                .set_content(box_horizontal.clone().into());
         }
 
         // draw non-corner bottom
@@ -479,9 +434,10 @@ impl<'a> DrawBufferGuard<'a> {
             .skip(1)
             .take(self.inner.rectangle.width() - 2)
         {
-            if let Some(mut t) = tuxel.clone().lock() {
-                t.set_content(box_horizontal.clone().into());
-            }
+            tuxel
+                .clone()
+                .lock()
+                .set_content(box_horizontal.clone().into());
         }
 
         // draw non-corner sides
@@ -494,24 +450,18 @@ impl<'a> DrawBufferGuard<'a> {
             // skip the last row
             .take(self.inner.rectangle.height() - 2)
         {
-            if let Some(mut t) = row
-                .iter()
+            row.iter()
                 .nth(0)
                 .expect("drawbuffer rows are always populated")
                 .clone()
                 .lock()
-            {
-                t.set_content(box_vertical.clone().into());
-            }
-            if let Some(mut t) = row
-                .iter()
+                .set_content(box_vertical.clone().into());
+            row.iter()
                 .nth(self.inner.rectangle.width() - 1)
                 .expect("drawbuffer rows are always populated")
                 .clone()
                 .lock()
-            {
-                t.set_content(box_vertical.clone().into());
-            }
+                .set_content(box_vertical.clone().into());
         }
 
         self.inner.border = true;
@@ -536,6 +486,21 @@ pub(crate) enum Modifier {
     ForegroundColor(u8, u8, u8),
     BackgroundColor(u8, u8, u8),
     Bold,
+}
+
+#[derive(Clone, Default)]
+struct SharedModifiers {
+    inner: Arc<Mutex<Vec<Modifier>>>,
+}
+
+impl SharedModifiers {
+    fn lock(&self) -> MutexGuard<Vec<Modifier>> {
+        self.inner.lock().expect("TODO: handle thread panicking better than this")
+    }
+
+    fn push(&self, m: Modifier) {
+        self.lock().push(m)
+    }
 }
 
 #[cfg(test)]
