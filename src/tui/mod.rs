@@ -73,6 +73,8 @@ impl Tui48Board {
         score.draw_border()?;
         score.fill(' ')?;
         score.write(&format!("{}", game.score()))?;
+        score.modify(Modifier::BackgroundColor(255,255,255));
+        score.modify(Modifier::ForegroundColor(0,0,0));
 
         let (width, height) = game.dimensions();
         let round = game.current();
@@ -90,7 +92,7 @@ impl Tui48Board {
                     let mut card_buffer = canvas.get_draw_buffer(Rectangle(idx, bounds))?;
                     card_buffer.draw_border()?;
                     card_buffer.fill(' ')?;
-                    card_buffer.write(&format!("2048"))?;
+                    card_buffer.write(&format!("{}", value))?;
                     opt = Some(card_buffer);
                 }
                 row.push(opt);
