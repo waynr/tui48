@@ -39,7 +39,8 @@ impl<T: Write> Renderer for Crossterm<T> {
         self.w.queue(terminal::BeginSynchronizedUpdate)?;
         self.w.queue(cursor::SavePosition)?;
         for result in c {
-            let tuxel = result?.lock();
+            let tuxel = result?;
+            let tuxel = tuxel.lock();
             if tuxel.active() {
                 for command in tuxel.modifiers().iter() {
                     self.queue(command)?;

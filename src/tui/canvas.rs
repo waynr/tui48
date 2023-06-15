@@ -61,10 +61,10 @@ impl Canvas {
     pub(crate) fn new(width: usize, height: usize) -> Self {
         let rectangle = Rectangle(Idx(0, 0, 0), Bounds2D(width, height));
         let mut grid: Vec<Vec<Stack>> = Vec::with_capacity(height);
-        for _ in 0..height {
+        for y in 0..height {
             let mut row: Vec<Stack> = Vec::with_capacity(width);
-            for _ in 0..width {
-                row.push(Stack::default());
+            for x in 0..width {
+                row.push(Stack::new(x, y));
             }
             grid.push(row);
         }
@@ -95,6 +95,7 @@ impl Canvas {
             .take(r.height())
             .enumerate()
         {
+            let mut buf_row = &mut buf[buf_y];
             for (buf_x, (x, cellstack)) in row
                 .iter_mut()
                 .enumerate()
@@ -103,8 +104,7 @@ impl Canvas {
                 .enumerate()
             {
                 let canvas_idx = Idx(x, y, r.0 .2);
-                let buf_idx = Idx(buf_x, buf_y, r.0 .2);
-                buf[buf_y][buf_x] = cellstack.acquire(canvas_idx, modifiers.clone())?;
+                buf_row.push(cellstack.acquire(canvas_idx, modifiers.clone())?);
             }
         }
         let dbuf = DrawBuffer::new(r.clone(), buf, modifiers);
@@ -132,12 +132,17 @@ impl Canvas {
 impl Iterator for &Canvas {
     type Item = Result<Tuxel>;
     fn next(&mut self) -> Option<Self::Item> {
-        match self.receiver.try_recv() {
-            Ok(stack) => Some(stack.top()),
-            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                unreachable!();
+        loop {
+            match self.receiver.try_recv() {
+                Ok(stack) => match stack.top() {
+                    Ok(Some(tuxel)) => return Some(Ok(tuxel)),
+                    _ => continue,
+                },
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    unreachable!();
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => return None,
             }
-            Err(std::sync::mpsc::TryRecvError::Empty) => None,
         }
     }
 }
@@ -156,34 +161,43 @@ struct Stack {
 }
 
 impl Stack {
+    fn new(x: usize, y: usize) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(StackInner {
+                cells: [
+                    Tuxel::new(Idx(x, y, 0)),
+                    Tuxel::new(Idx(x, y, 1)),
+                    Tuxel::new(Idx(x, y, 2)),
+                    Tuxel::new(Idx(x, y, 3)),
+                    Tuxel::new(Idx(x, y, 4)),
+                    Tuxel::new(Idx(x, y, 5)),
+                    Tuxel::new(Idx(x, y, 6)),
+                    Tuxel::new(Idx(x, y, 7)),
+                ],
+            })),
+        }
+    }
+
     fn acquire(&mut self, idx: Idx, shared_modifiers: SharedModifiers) -> Result<Tuxel> {
         let clone = self.inner.clone();
         let mut inner = clone.lock().expect("lock unexpectedly poisoned");
         let tuxel = &mut inner.cells[idx.2];
-        let mut tguard = tuxel.lock();
-        tguard.inner.shared_modifiers = shared_modifiers;
+        tuxel.clone().lock().inner.shared_modifiers = shared_modifiers;
         Ok(tuxel.clone())
     }
 
-    fn top(&self) -> Result<Tuxel> {
-        let cloned = self.inner.clone();
-        let readable = cloned.lock().expect("lock unexpectedly poisoned");
-
-        Ok(readable
+    fn top(&self) -> Result<Option<Tuxel>> {
+        Ok(self
+            .inner
+            .lock()
+            .expect("TODO")
             .cells
-            .iter()
+            // low-index elements of a stack are below high-index elements. we want to find the
+            // first active tuxel on top of the stack so we iterate over elements in reverse
+            .iter_mut()
             .rev()
             .find(|t| t.lock().active())
-            .map_or_else(
-                || {
-                    readable
-                        .cells
-                        .first()
-                        .expect("Stack is always populated")
-                        .clone()
-                },
-                |s| s.clone(),
-            ))
+            .map(|s| s.clone()))
     }
 }
 
@@ -216,7 +230,7 @@ impl<'a> TuxelGuard<'a> {
     }
 
     pub(crate) fn modifiers(&self) -> Vec<Modifier> {
-        let mut parent_modifiers= &self.inner.shared_modifiers.lock();
+        let mut parent_modifiers = &mut self.inner.shared_modifiers.lock();
         let mut modifiers: Vec<Modifier> = self.inner.modifiers.clone();
         parent_modifiers.append(&mut modifiers);
         parent_modifiers.to_vec()
@@ -261,13 +275,17 @@ impl<'a> Tuxel {
         }
     }
 
-    pub(crate) fn lock(&'a mut self) -> TuxelGuard<'a> {
+    pub(crate) fn lock(&'a self) -> TuxelGuard<'a> {
         TuxelGuard {
             inner: self
                 .inner
                 .lock()
                 .expect("TODO: handle thread panicking better than this"),
         }
+    }
+
+    pub(crate) fn active(&self) -> bool {
+        self.lock().active()
     }
 }
 
@@ -282,10 +300,7 @@ struct DrawBufferInner {
 impl Drop for DrawBufferInner {
     fn drop(&mut self) {
         for row in self.buf.iter_mut() {
-            for mut tguard in row
-                .iter_mut()
-                .map(|t| t.lock())
-            {
+            for mut tguard in row.iter_mut().map(|t| t.lock()) {
                 tguard.clear();
                 tguard.inner.shared_modifiers = SharedModifiers::default();
             }
@@ -495,7 +510,9 @@ struct SharedModifiers {
 
 impl SharedModifiers {
     fn lock(&self) -> MutexGuard<Vec<Modifier>> {
-        self.inner.lock().expect("TODO: handle thread panicking better than this")
+        self.inner
+            .lock()
+            .expect("TODO: handle thread panicking better than this")
     }
 
     fn push(&self, m: Modifier) {
