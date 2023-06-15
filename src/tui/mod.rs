@@ -111,14 +111,14 @@ pub(crate) struct Tui48 {
     renderer: Box<dyn Renderer>,
     canvas: Canvas,
     board: Board,
-    tui_board: Tui48Board,
+    tui_board: Option<Tui48Board>,
 }
 
 impl Tui48 {
     pub(crate) fn new<T: Write + 'static>(board: Board, w: Box<T>) -> Result<Self> {
         let (width, height) = size()?;
         let mut canvas = Canvas::new(width as usize, height as usize);
-        let tui_board = Tui48Board::new(&board, &mut canvas)?;
+        let tui_board = Some(Tui48Board::new(&board, &mut canvas)?);
         Ok(Self {
             board,
             renderer: Box::new(Crossterm::<T>::new(w)?),
@@ -136,6 +136,8 @@ impl Tui48 {
                 Event::UserInput(UserInput::Direction(d)) => self.shift(d)?,
                 Event::UserInput(UserInput::Quit) => break,
             }
+            self.canvas.draw_all();
+            self.renderer.render(&self.canvas);
         }
 
         Ok(())
@@ -144,7 +146,11 @@ impl Tui48 {
 
 impl Tui48 {
     fn shift(&mut self, direction: Direction) -> Result<()> {
-        if let Some(hint) = self.board.shift(direction) {}
+        if let Some(hint) = self.board.shift(direction) {
+            let tb = self.tui_board.take();
+            drop(tb);
+            self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
+        }
         Ok(())
     }
 }
