@@ -59,13 +59,6 @@ impl Round {
         r.slots[ydx2][xdx2] = 2;
         r
     }
-}
-
-// private methods
-impl Round {
-    fn iter_mut(&self, direction: Direction) -> Indices {
-        Indices::new(self, direction)
-    }
 
     pub(crate) fn get(&self, idx: &Idx) -> Card {
         *self
@@ -74,6 +67,13 @@ impl Round {
             .expect(format!("invalid y coordinate {}", idx.1).as_str())
             .get(idx.0)
             .expect(format!("invalid x coordinate {}", idx.0).as_str())
+    }
+}
+
+// private methods
+impl Round {
+    fn iter_mut(&self, direction: Direction) -> Indices {
+        Indices::new(self, direction)
     }
 
     fn get_mut(&mut self, idx: &Idx) -> &mut Card {
