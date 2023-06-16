@@ -11,6 +11,7 @@ use crate::tui::crossterm::{next_event, size, Crossterm};
 
 pub(crate) trait Renderer {
     fn render(&mut self, c: &Canvas) -> Result<()>;
+    fn clear(&mut self, c: &Canvas) -> Result<()>;
 }
 
 pub(crate) enum Event {

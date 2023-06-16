@@ -40,6 +40,34 @@ impl<T: Write> Drop for Crossterm<T> {
 }
 
 impl<T: Write> Renderer for Crossterm<T> {
+    fn clear(&mut self, c: &Canvas) -> Result<()> {
+        let (width, height) = c.dimensions();
+        self.w
+            .queue(terminal::BeginSynchronizedUpdate)
+            .with_context(|| "queue synchronized update")?;
+        self.w
+            .queue(cursor::SavePosition)
+            .with_context(|| "queue save cursor position")?;
+        for x in 0..width {
+            for y in 0..height {
+                self.w
+                    .queue(cursor::MoveTo(x as u16, y as u16))
+                    .with_context(|| "queue moving cursor")?;
+                self.w
+                    .queue(style::Print(" "))
+                    .with_context(|| "queue printing tuxel text")?;
+            }
+        }
+        self.w
+            .queue(cursor::RestorePosition)
+            .with_context(|| "queue restore position")?;
+        self.w
+            .queue(terminal::EndSynchronizedUpdate)
+            .with_context(|| "queue end synchronized update")?;
+        self.w.flush().with_context(|| "flush writer")?;
+        Ok(())
+    }
+
     fn render(&mut self, c: &Canvas) -> Result<()> {
         self.w
             .queue(terminal::BeginSynchronizedUpdate)
