@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -39,39 +38,6 @@ impl Rectangle {
             Position::BottomRight => (self.width() - 1, self.height() - 1),
             Position::Idx(x, y) => (*x, *y),
         }
-    }
-
-    pub(crate) fn extents(&self) -> (usize, usize) {
-        (self.0 .0 + self.1 .0, self.0 .1 + self.1 .1)
-    }
-}
-
-impl PartialEq for Rectangle {
-    fn eq(&self, other: &Self) -> bool {
-        (self.0 .0, self.0 .1, self.0 .2, self.1 .0, self.1 .1)
-            == (other.0 .0, other.0 .1, other.0 .2, other.1 .0, other.1 .1)
-    }
-}
-
-impl Eq for Rectangle {}
-
-impl PartialOrd for Rectangle {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        <&Rectangle as Into<[usize; 5]>>::into(self)
-            .iter()
-            .zip(<&Rectangle as Into<[usize; 5]>>::into(other).iter())
-            .map(|(left, right)| left.partial_cmp(right))
-            // there is only an order relationship between self and other if all fields of both
-            // elements all have the same respective ordering relationship
-            .reduce(|acc, v| if acc == v { v } else { None })
-            // won't panic since we are iterating over fixed-size arrays
-            .expect("unwrap Option from Reduce")
-    }
-}
-
-impl Into<[usize; 5]> for &Rectangle {
-    fn into(self) -> [usize; 5] {
-        [self.0 .0, self.0 .1, self.0 .2, self.1 .0, self.1 .1]
     }
 }
 
