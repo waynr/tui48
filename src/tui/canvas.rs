@@ -39,6 +39,10 @@ impl Rectangle {
             Position::Idx(x, y) => (*x, *y),
         }
     }
+
+    pub(crate) fn extents(&self) -> (usize, usize) {
+        (self.0 .0 + self.1 .0, self.0 .1 + self.1 .1)
+    }
 }
 
 pub(crate) enum Position {
@@ -126,6 +130,10 @@ impl Canvas {
 
     fn translate_tuxels(&mut self, ts: Vec<Arc<Mutex<Tuxel>>>) -> Result<()> {
         Err(String::from("not implemented").into())
+    }
+
+    pub(crate) fn dimensions(&self) -> (usize, usize) {
+        (self.rectangle.1.0, self.rectangle.1.1)
     }
 }
 

@@ -65,7 +65,14 @@ struct Tui48Board {
 ///
 impl Tui48Board {
     fn new(game: &Board, canvas: &mut Canvas) -> Result<Self> {
-        let mut board = canvas.get_draw_buffer(Rectangle(Idx(5, 5, 0), Bounds2D(36, 25)))?;
+        let board_rectangle = Rectangle(Idx(5, 5, 0), Bounds2D(36, 25));
+        let (cwidth, cheight) = canvas.dimensions();
+        let (x_extent, y_extent) = board_rectangle.extents();
+        if cwidth < x_extent || cheight < y_extent {
+            return Err(Box::new(Error::TerminalTooSmall(cwidth, cheight)));
+        }
+
+        let mut board = canvas.get_draw_buffer(board_rectangle)?;
         board.draw_border()?;
         board.fill(' ')?;
 
