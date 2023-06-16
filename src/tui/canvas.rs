@@ -580,12 +580,27 @@ mod test {
         Ok(())
     }
 
+    fn tuxel_buf_from_rectangle(rect: &Rectangle) -> Vec<Vec<Tuxel>> {
+        let mut tuxels: Vec<Vec<Tuxel>> = Vec::new();
+        for y in 0..rect.height() {
+            let mut row: Vec<Tuxel> = Vec::new();
+            for x in 0..rect.width() {
+                let t = Tuxel::new(Idx(x, y, 0));
+                row.push(t);
+            }
+            tuxels.push(row);
+        }
+
+        tuxels
+    }
+
     #[rstest]
     #[case::base(rectangle(0, 0, 0, 5, 5))]
     #[case::asymmetric(rectangle(0, 0, 0, 274, 75))]
     #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
     fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
-        let buf = DrawBuffer::new(rect.clone());
+        let tuxels = tuxel_buf_from_rectangle(&rect);
+        let buf = DrawBuffer::new(rect.clone(), tuxels, SharedModifiers::default());
         let inner = buf.inner.lock().unwrap();
         assert_eq!(inner.buf.len(), rect.height());
         for row in &inner.buf {

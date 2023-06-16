@@ -47,6 +47,17 @@ pub(crate) struct Round {
     new_tile_weighted_index: WeightedIndex<u8>,
 }
 
+impl Default for Round {
+    fn default() -> Self {
+        Round {
+            slots: [[0; 4]; 4],
+            score: Score::default(),
+            new_tile_weighted_index: WeightedIndex::new(NEW_CARD_WEIGHTS)
+                .expect("NEW_CARD_WEIGHTS should never be empty"),
+        }
+    }
+}
+
 // public methods
 impl Round {
     pub(crate) fn score(&self) -> Score {
@@ -54,12 +65,7 @@ impl Round {
     }
 
     pub(crate) fn random(rng: &mut ThreadRng) -> Self {
-        let mut r = Round {
-            slots: [[0; 4]; 4],
-            score: Score::default(),
-            new_tile_weighted_index: WeightedIndex::new(NEW_CARD_WEIGHTS)
-                .expect("NEW_CARD_WEIGHTS should never be empty"),
-        };
+        let mut r = Round::default();
         let (xdx1, ydx1) = (rng.gen_range(0..3), rng.gen_range(0..3));
         let (xdx2, ydx2) = (rng.gen_range(0..3), rng.gen_range(0..3));
         loop {
@@ -258,15 +264,14 @@ impl Indices {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use rand::thread_rng;
     use rstest::*;
+
+    use super::*;
 
     #[test]
     fn clone() {
-        let initial = Round {
-            score: 0,
-            slots: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-        };
+        let initial = Round::default();
         let cloned = initial.clone();
         assert_eq!(initial, cloned);
         assert_eq!(initial.score, cloned.score);
@@ -274,10 +279,7 @@ mod test {
 
     #[test]
     fn shift_empty() {
-        let initial = Round {
-            score: 0,
-            slots: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-        };
+        let initial = Round::default();
 
         for direction in [
             Direction::Left,
@@ -286,7 +288,8 @@ mod test {
             Direction::Down,
         ] {
             let mut shifted = initial.clone();
-            let hint = shifted.shift(&direction);
+            let mut rng = thread_rng();
+            let hint = shifted.shift(&mut rng, &direction);
             assert_eq!(initial, shifted, "shifting {:?}", direction);
             assert_eq!(initial.score, shifted.score, "shifting {:?}", direction);
         }
@@ -350,23 +353,20 @@ mod test {
         #[case] initial: [[Card; 4]; 4],
         #[case] expected: [[Card; 4]; 4],
     ) {
-        let initial = Round {
-            score: 0,
-            slots: initial,
-        };
-
-        let expected = Round {
-            score: 0,
-            slots: expected,
-        };
+        let initial = round(initial, 0);
+        let expected = round(expected, 0);
 
         let mut shifted = initial.clone();
-        let hint = shifted.shift(&direction);
+        let mut rng = thread_rng();
+        let hint = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 
     fn round(slots: [[Card; 4]; 4], score: Score) -> Round {
-        Round { score, slots }
+        let mut r = Round::default();
+        r.slots = slots;
+        r.score = score;
+        r
     }
 
     #[rstest]
@@ -417,7 +417,8 @@ mod test {
     )]
     fn combine(#[case] direction: Direction, #[case] initial: Round, #[case] expected: Round) {
         let mut shifted = initial.clone();
-        let hint = shifted.shift(&direction);
+        let mut rng = thread_rng();
+        let hint = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 }
