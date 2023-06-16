@@ -1,12 +1,12 @@
 use std::io::Write;
 
-use crate::board::{Board, Direction};
-use crate::round::Idx as BoardIdx;
-use crate::error::Result;
-
-mod canvas;
+pub(crate) mod canvas;
 use canvas::{Bounds2D, Canvas, DrawBuffer, Idx, Modifier, Rectangle};
 mod crossterm;
+
+use crate::board::{Board, Direction};
+use crate::error::{Error, Result};
+use crate::round::Idx as BoardIdx;
 use crate::tui::crossterm::{next_event, size, Crossterm};
 
 pub(crate) trait Renderer {
@@ -16,6 +16,7 @@ pub(crate) trait Renderer {
 
 pub(crate) enum Event {
     UserInput(UserInput),
+    Resize,
 }
 
 pub(crate) enum UserInput {
@@ -125,34 +126,60 @@ pub(crate) struct Tui48 {
 impl Tui48 {
     pub(crate) fn new<T: Write + 'static>(board: Board, w: Box<T>) -> Result<Self> {
         let (width, height) = size()?;
-        let mut canvas = Canvas::new(width as usize, height as usize);
-        let tui_board = Some(Tui48Board::new(&board, &mut canvas)?);
         Ok(Self {
             board,
             renderer: Box::new(Crossterm::<T>::new(w)?),
-            canvas,
-            tui_board,
+            canvas: Canvas::new(width as usize, height as usize),
+            tui_board: None,
         })
     }
 
     /// Run consumes the Tui48 instance and takes control of the terminal to begin gameplay.
     pub(crate) fn run(mut self) -> Result<()> {
-        self.renderer.render(&self.canvas)?;
+        self.resize()?;
 
         loop {
+            let mut message_buf = match self.tui_board {
+                Some(_) => None,
+                None => {
+                    let mut buf = self.canvas.get_layer(7)?;
+                    buf.write_left("hey there! something is wrong! try resizing your terminal!")?;
+                    Some(buf)
+                }
+            };
+
+            self.renderer.render(&self.canvas)?;
+
             match next_event()? {
                 Event::UserInput(UserInput::Direction(d)) => self.shift(d)?,
                 Event::UserInput(UserInput::Quit) => break,
+                Event::Resize => {
+                    self.resize()?;
+                    match message_buf.take() {
+                        Some(b) => drop(b),
+                        None => (),
+                    };
+                    self.renderer.clear(&self.canvas)?;
+                }
             }
             self.canvas.draw_all();
-            self.renderer.render(&self.canvas);
         }
-
         Ok(())
     }
 }
 
 impl Tui48 {
+    fn resize(&mut self) -> Result<()> {
+        let (width, height) = size()?;
+        self.canvas = Canvas::new(width as usize, height as usize);
+        self.tui_board = match Tui48Board::new(&self.board, &mut self.canvas) {
+            Ok(tb) => Some(tb),
+            Err(Error::TerminalTooSmall(_, _)) => None,
+            Err(e) => return Err(e),
+        };
+        Ok(())
+    }
+
     fn shift(&mut self, direction: Direction) -> Result<()> {
         if let Some(hint) = self.board.shift(direction) {
             let tb = self.tui_board.take();
