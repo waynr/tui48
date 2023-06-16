@@ -64,7 +64,7 @@ impl Round {
         self.score
     }
 
-    pub(crate) fn random(rng: &mut ThreadRng) -> Self {
+    pub(crate) fn random<T: Rng>(rng: &mut T) -> Self {
         let mut r = Round::default();
         let (xdx1, ydx1) = (rng.gen_range(0..3), rng.gen_range(0..3));
         let (xdx2, ydx2) = (rng.gen_range(0..3), rng.gen_range(0..3));
@@ -109,7 +109,7 @@ impl Round {
         *rf = value;
     }
 
-    pub fn shift(&mut self, rng: &mut ThreadRng, direction: &Direction) -> Option<AnimationHint> {
+    pub fn shift<T: Rng>(&mut self, mut rng: T, direction: &Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::default();
         let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
@@ -153,9 +153,9 @@ impl Round {
                 .chunks(4)
                 .map(|row| row.last().expect("all rows are expected to be populated"))
                 .filter(|idx| self.get(idx) == 0)
-                .choose(rng)
+                .choose(&mut rng)
                 .expect("all rows are populated and at least one row has changed");
-            let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(rng)];
+            let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(&mut rng)];
             self.set(idx, new_value);
             Some(hint)
         } else {
@@ -264,10 +264,21 @@ impl Indices {
 
 #[cfg(test)]
 mod test {
-    use rand::thread_rng;
     use rstest::*;
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
 
     use super::*;
+    fn rng() -> SmallRng {
+        SmallRng::seed_from_u64(42)
+    }
+
+    fn round(slots: [[Card; 4]; 4], score: Score) -> Round {
+        let mut r = Round::default();
+        r.slots = slots;
+        r.score = score;
+        r
+    }
 
     #[test]
     fn clone() {
@@ -288,7 +299,7 @@ mod test {
             Direction::Down,
         ] {
             let mut shifted = initial.clone();
-            let mut rng = thread_rng();
+            let mut rng = rng();
             let hint = shifted.shift(&mut rng, &direction);
             assert_eq!(initial, shifted, "shifting {:?}", direction);
             assert_eq!(initial.score, shifted.score, "shifting {:?}", direction);
@@ -298,55 +309,55 @@ mod test {
     #[rstest]
     #[case::identity_left(Direction::Left,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
+           [[1, 0, 0, 2], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::identity_right(Direction::Right,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
+           [[2, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
     )]
     #[case::identity_up(Direction::Up,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [2, 0, 0, 0]],
     )]
     #[case::identity_down(Direction::Down,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
+           [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
     )]
     #[case::flipped_identity_left(Direction::Left,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
+           [[1, 0, 0, 2], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::flipped_identity_right(Direction::Right,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
+           [[2, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
     )]
     #[case::flipped_identity_up(Direction::Up,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [2, 0, 0, 0]],
     )]
     #[case::flipped_identity_down(Direction::Down,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
+           [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
     )]
     #[case::all_left(Direction::Left,
            [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
-           [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
+           [[1, 0, 0, 2], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::all_right(Direction::Right,
            [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
-           [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
+           [[2, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
     )]
     #[case::all_down(Direction::Down,
            [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-           [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
+           [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
     )]
     #[case::all_up(Direction::Up,
            [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
-           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [2, 0, 0, 0]],
     )]
     #[case::pivot_is_zero_with_multiple_shift_elements(Direction::Left,
            [[0, 1, 2, 3], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-           [[1, 2, 3, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+           [[1, 2, 3, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
     )]
     fn shift(
         #[case] direction: Direction,
@@ -357,38 +368,31 @@ mod test {
         let expected = round(expected, 0);
 
         let mut shifted = initial.clone();
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let hint = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
-    }
-
-    fn round(slots: [[Card; 4]; 4], score: Score) -> Round {
-        let mut r = Round::default();
-        r.slots = slots;
-        r.score = score;
-        r
     }
 
     #[rstest]
     #[case::all1s(
         Direction::Left,
         round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
-        round([[2, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
     )]
     #[case::combine2s_shift_remaining(
         Direction::Left,
         round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[4, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
     )]
     #[case::combine2s_shift_remaining(
         Direction::Left,
         round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[4, 2, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
     )]
     #[case::combine2s_ignore_4(
         Direction::Left,
         round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
-        round([[4, 4, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+        round([[4, 4, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
     )]
     #[case::noop_no_compatible_combinations(
         Direction::Left,
@@ -398,17 +402,17 @@ mod test {
     #[case::all1s_right(
         Direction::Right,
         round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
-        round([[0, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+        round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
     )]
     #[case::combine2s_shift_remaining_right(
         Direction::Right,
         round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[0, 0, 2, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[2, 0, 2, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
     )]
     #[case::combine2s_ignore_4_right(
         Direction::Right,
         round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
-        round([[0, 0, 4, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+        round([[2, 0, 4, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
     )]
     #[case::noop_no_compatible_combinations_right(
         Direction::Right,
@@ -417,7 +421,7 @@ mod test {
     )]
     fn combine(#[case] direction: Direction, #[case] initial: Round, #[case] expected: Round) {
         let mut shifted = initial.clone();
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let hint = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
