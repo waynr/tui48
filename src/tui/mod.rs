@@ -101,7 +101,7 @@ impl Tui48Board {
                     let mut card_buffer = canvas.get_draw_buffer(Rectangle(idx, bounds))?;
                     card_buffer.draw_border()?;
                     card_buffer.fill(' ')?;
-                    card_buffer.write_right(&format!("{}", value))?;
+                    card_buffer.write_center(&format!("{}", value))?;
                     opt = Some(card_buffer);
                 }
                 row.push(opt);

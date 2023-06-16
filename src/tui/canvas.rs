@@ -100,12 +100,7 @@ impl Canvas {
             .enumerate()
         {
             let buf_row = &mut buf[buf_y];
-            for (x, cellstack) in row
-                .iter_mut()
-                .enumerate()
-                .skip(r.x())
-                .take(r.width())
-            {
+            for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
                 let canvas_idx = Idx(x, y, r.0 .2);
                 buf_row.push(cellstack.acquire(canvas_idx, modifiers.clone())?);
             }
@@ -368,6 +363,31 @@ impl DrawBuffer {
             }
             guard
                 .get_tuxel(Position::Idx(x - offset, y))
+                .lock()
+                .set_content(c);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_center(&mut self, s: &str) -> Result<()> {
+        let mut guard = self.lock();
+        let y_offset = guard.inner.rectangle.height() / 2;
+        let width = guard.inner.rectangle.width();
+        let available_width = if guard.inner.border { width - 2 } else { width };
+        let border_offset = if guard.inner.border { 1 } else { 0 };
+        let x_offset = if s.len() >= available_width {
+            border_offset
+        } else {
+            border_offset + ((available_width - s.len()) / 2 + (available_width - s.len()) % 2)
+        };
+        for (idx, c) in s
+            .chars()
+            .rev()
+            .enumerate()
+            .take_while(|(idx, _)| *idx < available_width)
+        {
+            guard
+                .get_tuxel(Position::Idx(idx + x_offset, y_offset))
                 .lock()
                 .set_content(c);
         }
