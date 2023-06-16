@@ -79,15 +79,15 @@ impl Tui48Board {
         let mut score = canvas.get_draw_buffer(Rectangle(Idx(18, 1, 0), Bounds2D(10, 3)))?;
         score.draw_border()?;
         score.fill(' ')?;
-        score.write(&format!("{}", game.score()))?;
-        score.modify(Modifier::BackgroundColor(255,255,255));
-        score.modify(Modifier::ForegroundColor(0,0,0));
+        score.write_right(&format!("{}", game.score()))?;
+        score.modify(Modifier::BackgroundColor(255, 255, 255));
+        score.modify(Modifier::ForegroundColor(0, 0, 0));
 
         let (width, height) = game.dimensions();
         let round = game.current();
         let mut slots = Vec::with_capacity(height);
         let x_offset = 5 + 1 + 2;
-        let y_offset = 5 + 1  ;
+        let y_offset = 5 + 1;
         for y in 0..height {
             let mut row = Vec::with_capacity(width);
             for x in 0..width {
@@ -99,7 +99,7 @@ impl Tui48Board {
                     let mut card_buffer = canvas.get_draw_buffer(Rectangle(idx, bounds))?;
                     card_buffer.draw_border()?;
                     card_buffer.fill(' ')?;
-                    card_buffer.write(&format!("{}", value))?;
+                    card_buffer.write_right(&format!("{}", value))?;
                     opt = Some(card_buffer);
                 }
                 row.push(opt);

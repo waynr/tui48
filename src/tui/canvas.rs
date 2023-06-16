@@ -345,7 +345,24 @@ impl DrawBuffer {
         self.lock().fill(c)
     }
 
-    pub(crate) fn write(&mut self, s: &str) -> Result<()> {
+    pub(crate) fn write_left(&mut self, s: &str) -> Result<()> {
+        let mut guard = self.lock();
+        let y = guard.inner.rectangle.height() / 2;
+        let x = if guard.inner.border { 1 } else { 0 };
+        for (offset, c) in s.chars().enumerate() {
+            if offset > guard.inner.rectangle.width() + x {
+                // can't write more than width of buffer
+                break;
+            }
+            guard
+                .get_tuxel(Position::Idx(offset + x, y))
+                .lock()
+                .set_content(c);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_right(&mut self, s: &str) -> Result<()> {
         let mut guard = self.lock();
         let y = guard.inner.rectangle.height() / 2;
         let x = if guard.inner.border {
