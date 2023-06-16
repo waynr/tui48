@@ -146,6 +146,7 @@ impl Round {
             let idx = idxs
                 .chunks(4)
                 .map(|row| row.last().expect("all rows are expected to be populated"))
+                .filter(|idx| self.get(idx) == 0)
                 .choose(rng)
                 .expect("all rows are populated and at least one row has changed");
             let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(rng)];
