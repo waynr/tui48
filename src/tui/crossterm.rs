@@ -28,6 +28,7 @@ impl<T: Write> Crossterm<T> {
 
 impl<T: Write> Drop for Crossterm<T> {
     fn drop(&mut self) {
+        self.w.execute(cursor::Show);
         self.w
             .execute(terminal::LeaveAlternateScreen)
             .expect("leaving alternate screen");
