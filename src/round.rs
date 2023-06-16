@@ -1,4 +1,9 @@
+use std::collections::HashSet;
+
+use rand::distributions::Distribution;
+use rand::distributions::WeightedIndex;
 use rand::rngs::ThreadRng;
+use rand::seq::IteratorRandom;
 use rand::Rng;
 
 use crate::board::Direction;
@@ -32,10 +37,14 @@ pub(crate) type Card = u16;
 
 pub(crate) type Score = u16;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+const NEW_CARD_CHOICES: [u16; 2] = [2, 4];
+const NEW_CARD_WEIGHTS: [u8; 2] = [9, 1];
+
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Round {
     slots: [[Card; 4]; 4],
     score: Score,
+    new_tile_weighted_index: WeightedIndex<u8>,
 }
 
 // public methods
@@ -45,7 +54,12 @@ impl Round {
     }
 
     pub(crate) fn random(rng: &mut ThreadRng) -> Self {
-        let mut r = Round::default();
+        let mut r = Round {
+            slots: [[0; 4]; 4],
+            score: Score::default(),
+            new_tile_weighted_index: WeightedIndex::new(NEW_CARD_WEIGHTS)
+                .expect("NEW_CARD_WEIGHTS should never be empty"),
+        };
         let (xdx1, ydx1) = (rng.gen_range(0..3), rng.gen_range(0..3));
         let (xdx2, ydx2) = (rng.gen_range(0..3), rng.gen_range(0..3));
         loop {
@@ -89,11 +103,11 @@ impl Round {
         *rf = value;
     }
 
-    pub fn shift(&mut self, direction: &Direction) -> Option<AnimationHint> {
+    pub fn shift(&mut self, rng: &mut ThreadRng, direction: &Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::default();
         let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
-        for row in rows {
+        for (i, row) in rows.enumerate() {
             let mut pivot_iter = row.iter();
             let mut pivot_idx = pivot_iter.next().expect("should always yield an index");
             let mut cmp_iter = pivot_iter.clone();
@@ -129,6 +143,13 @@ impl Round {
             }
         }
         if hint.changed {
+            let idx = idxs
+                .chunks(4)
+                .map(|row| row.last().expect("all rows are expected to be populated"))
+                .choose(rng)
+                .expect("all rows are populated and at least one row has changed");
+            let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(rng)];
+            self.set(idx, new_value);
             Some(hint)
         } else {
             None

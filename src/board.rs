@@ -38,7 +38,7 @@ impl Board {
             .last()
             .expect("there should always be a previous round");
         let mut round = prev.clone();
-        let hint = round.shift(&direction);
+        let hint = round.shift(&mut self.rng, &direction);
 
         if hint.is_some() {
             self.rounds.push(round);
