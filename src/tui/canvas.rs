@@ -129,7 +129,7 @@ impl Canvas {
     }
 
     fn translate_tuxels(&mut self, ts: Vec<Arc<Mutex<Tuxel>>>) -> Result<()> {
-        Err(String::from("not implemented").into())
+        unimplemented!()
     }
 
     pub(crate) fn dimensions(&self) -> (usize, usize) {
@@ -164,7 +164,7 @@ struct StackInner {
 }
 
 #[derive(Clone, Default)]
-struct Stack {
+pub(crate) struct Stack {
     inner: Arc<Mutex<StackInner>>,
 }
 

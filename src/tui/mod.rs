@@ -69,7 +69,7 @@ impl Tui48Board {
         let (cwidth, cheight) = canvas.dimensions();
         let (x_extent, y_extent) = board_rectangle.extents();
         if cwidth < x_extent || cheight < y_extent {
-            return Err(Box::new(Error::TerminalTooSmall(cwidth, cheight)));
+            return Err(Error::TerminalTooSmall(cwidth, cheight));
         }
 
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
