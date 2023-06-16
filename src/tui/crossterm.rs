@@ -21,6 +21,7 @@ impl<T: Write> Crossterm<T> {
     pub(crate) fn new(mut w: Box<T>) -> Result<Self> {
         terminal::enable_raw_mode()?;
         w.execute(terminal::EnterAlternateScreen)?;
+        w.execute(cursor::Hide)?;
         Ok(Self { w })
     }
 }
