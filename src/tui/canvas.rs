@@ -133,7 +133,7 @@ impl Canvas {
     }
 
     pub(crate) fn dimensions(&self) -> (usize, usize) {
-        (self.rectangle.1.0, self.rectangle.1.1)
+        (self.rectangle.1 .0, self.rectangle.1 .1)
     }
 }
 
