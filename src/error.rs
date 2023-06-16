@@ -5,13 +5,6 @@ pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {
-    #[error("out of bounds x - {0}")]
-    OutOfBoundsX(usize),
-    #[error("out of bounds y - {0}")]
-    OutOfBoundsY(usize),
-    #[error("out of bounds z - {0}")]
-    OutOfBoundsZ(usize),
-
     #[error("terminal too small, required minimum size {0} x {1}")]
     TerminalTooSmall(usize, usize),
 

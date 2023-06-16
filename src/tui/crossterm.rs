@@ -31,7 +31,7 @@ impl<T: Write> Crossterm<T> {
 
 impl<T: Write> Drop for Crossterm<T> {
     fn drop(&mut self) {
-        self.w.execute(cursor::Show);
+        self.w.execute(cursor::Show).expect("showing cursor again");
         self.w
             .execute(terminal::LeaveAlternateScreen)
             .expect("leaving alternate screen");
@@ -165,6 +165,5 @@ fn handle_key_event(ke: KeyEvent) -> Option<UserInput> {
             KeyCode::Char('q') => Some(UserInput::Quit),
             _ => None,
         },
-        _ => None,
     }
 }

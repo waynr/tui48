@@ -25,9 +25,9 @@ pub(crate) enum UserInput {
 }
 
 struct Tui48Board {
-    board: DrawBuffer,
-    score: DrawBuffer,
-    slots: Vec<Vec<Option<DrawBuffer>>>,
+    _board: DrawBuffer,
+    _score: DrawBuffer,
+    _slots: Vec<Vec<Option<DrawBuffer>>>,
 }
 
 /// Generates a 2048 TUI layout with legible numbers.
@@ -109,9 +109,9 @@ impl Tui48Board {
             slots.push(row);
         }
         Ok(Self {
-            board,
-            score,
-            slots,
+            _board: board,
+            _score: score,
+            _slots: slots,
         })
     }
 }
@@ -162,7 +162,7 @@ impl Tui48 {
                     self.renderer.clear(&self.canvas)?;
                 }
             }
-            self.canvas.draw_all();
+            self.canvas.draw_all()?;
         }
         Ok(())
     }
@@ -181,7 +181,7 @@ impl Tui48 {
     }
 
     fn shift(&mut self, direction: Direction) -> Result<()> {
-        if let Some(hint) = self.board.shift(direction) {
+        if let Some(_hint) = self.board.shift(direction) {
             let tb = self.tui_board.take();
             drop(tb);
             self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);

@@ -88,7 +88,7 @@ impl Canvas {
         let mut buf: Vec<_> = Vec::with_capacity(r.height());
         let modifiers = SharedModifiers::default();
         for _ in 0..r.height() {
-            let mut row: Vec<Tuxel> = Vec::with_capacity(r.width());
+            let row: Vec<Tuxel> = Vec::with_capacity(r.width());
             buf.push(row);
         }
         for (buf_y, (y, row)) in self
@@ -99,13 +99,12 @@ impl Canvas {
             .take(r.height())
             .enumerate()
         {
-            let mut buf_row = &mut buf[buf_y];
-            for (buf_x, (x, cellstack)) in row
+            let buf_row = &mut buf[buf_y];
+            for (x, cellstack) in row
                 .iter_mut()
                 .enumerate()
                 .skip(r.x())
                 .take(r.width())
-                .enumerate()
             {
                 let canvas_idx = Idx(x, y, r.0 .2);
                 buf_row.push(cellstack.acquire(canvas_idx, modifiers.clone())?);
@@ -120,16 +119,12 @@ impl Canvas {
     }
 
     pub(crate) fn draw_all(&mut self) -> Result<()> {
-        for (y, row) in self.grid.iter().enumerate() {
-            for (x, stack) in row.iter().enumerate() {
+        for row in self.grid.iter() {
+            for stack in row.iter() {
                 self.sender.send(stack.clone())?
             }
         }
         Ok(())
-    }
-
-    fn translate_tuxels(&mut self, ts: Vec<Arc<Mutex<Tuxel>>>) -> Result<()> {
-        unimplemented!()
     }
 
     pub(crate) fn dimensions(&self) -> (usize, usize) {
@@ -238,7 +233,7 @@ impl<'a> TuxelGuard<'a> {
     }
 
     pub(crate) fn modifiers(&self) -> Vec<Modifier> {
-        let mut parent_modifiers = &mut self.inner.shared_modifiers.lock();
+        let parent_modifiers = &mut self.inner.shared_modifiers.lock();
         let mut modifiers: Vec<Modifier> = self.inner.modifiers.clone();
         parent_modifiers.append(&mut modifiers);
         parent_modifiers.to_vec()
@@ -290,10 +285,6 @@ impl<'a> Tuxel {
                 .lock()
                 .expect("TODO: handle thread panicking better than this"),
         }
-    }
-
-    pub(crate) fn active(&self) -> bool {
-        self.lock().active()
     }
 }
 

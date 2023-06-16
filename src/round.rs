@@ -1,8 +1,5 @@
-use std::collections::HashSet;
-
 use rand::distributions::Distribution;
 use rand::distributions::WeightedIndex;
-use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 
@@ -113,7 +110,7 @@ impl Round {
         let mut hint = AnimationHint::default();
         let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
-        for (i, row) in rows.enumerate() {
+        for row in rows {
             let mut pivot_iter = row.iter();
             let mut pivot_idx = pivot_iter.next().expect("should always yield an index");
             let mut cmp_iter = pivot_iter.clone();
