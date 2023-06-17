@@ -302,79 +302,46 @@ impl Drop for DrawBufferInner {
     }
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct DrawBuffer {
-    inner: Arc<Mutex<DrawBufferInner>>,
-}
-
-impl DrawBuffer {
-    fn new(rectangle: Rectangle, buf: Vec<Vec<Tuxel>>, modifiers: SharedModifiers) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(DrawBufferInner {
-                rectangle,
-                border: false,
-                buf,
-                modifiers,
-            })),
-        }
-    }
-
-    pub(crate) fn modify(&mut self, modifier: Modifier) {
-        self.lock().inner.modifiers.push(modifier)
-    }
-
-    pub(crate) fn draw_border(&mut self) -> Result<()> {
-        self.lock().draw_border()
-    }
-
-    pub(crate) fn fill(&mut self, c: char) -> Result<()> {
-        self.lock().fill(c)
-    }
-
-    pub(crate) fn write_left(&mut self, s: &str) -> Result<()> {
-        let mut guard = self.lock();
-        let y = guard.inner.rectangle.height() / 2;
-        let x = if guard.inner.border { 1 } else { 0 };
+impl DrawBufferInner {
+    fn write_left(&mut self, s: &str) -> Result<()> {
+        let y = self.rectangle.height() / 2;
+        let x = if self.border { 1 } else { 0 };
         for (offset, c) in s.chars().enumerate() {
-            if offset > guard.inner.rectangle.width() + x {
+            if offset > self.rectangle.width() + x {
                 // can't write more than width of buffer
                 break;
             }
-            guard
-                .get_tuxel(Position::Idx(offset + x, y))
+            self.get_tuxel(Position::Idx(offset + x, y))
                 .lock()
                 .set_content(c);
         }
         Ok(())
     }
 
-    pub(crate) fn write_right(&mut self, s: &str) -> Result<()> {
-        let mut guard = self.lock();
-        let y = guard.inner.rectangle.height() / 2;
-        let x = if guard.inner.border {
-            guard.inner.rectangle.width() - 2
+    fn write_right(&mut self, s: &str) -> Result<()> {
+        let y = self.rectangle.height() / 2;
+        let x = if self.border {
+            self.rectangle.width() - 2
         } else {
-            guard.inner.rectangle.width() - 1
+            self.rectangle.width() - 1
         };
         for (offset, c) in s.chars().rev().enumerate() {
             if offset > x + 1 {
                 // can't write more than width of buffer
                 break;
             }
-            guard
-                .get_tuxel(Position::Idx(x - offset, y))
+            self.get_tuxel(Position::Idx(x - offset, y))
                 .lock()
                 .set_content(c);
         }
         Ok(())
     }
 
-    pub(crate) fn write_center(&mut self, s: &str) -> Result<()> {
-        let mut guard = self.lock();
-        let y_offset = guard.inner.rectangle.height() / 2;
-        let width = guard.inner.rectangle.width();
-        let available_width = if guard.inner.border { width - 2 } else { width };
-        let border_offset = if guard.inner.border { 1 } else { 0 };
+    fn write_center(&mut self, s: &str) -> Result<()> {
+        let y_offset = self.rectangle.height() / 2;
+        let width = self.rectangle.width();
+        let available_width = if self.border { width - 2 } else { width };
+        let border_offset = if self.border { 1 } else { 0 };
         let x_offset = if s.len() >= available_width {
             border_offset
         } else {
@@ -385,47 +352,40 @@ impl DrawBuffer {
             .enumerate()
             .take_while(|(idx, _)| *idx < available_width)
         {
-            guard
-                .get_tuxel(Position::Idx(idx + x_offset, y_offset))
+            self.get_tuxel(Position::Idx(idx + x_offset, y_offset))
                 .lock()
                 .set_content(c);
         }
         Ok(())
     }
-}
 
-impl<'a> DrawBuffer {
-    pub(crate) fn lock(&'a self) -> DrawBufferGuard<'a> {
-        self.inner
-            .as_ref()
-            .lock()
-            .map(|v| DrawBufferGuard { inner: v })
-            .expect("TODO: handle thread panicking better than this")
+    fn get_tuxel(&mut self, pos: Position) -> Tuxel {
+        let (x, y) = self.rectangle.relative_idx(&pos);
+        self.buf
+            .get(y)
+            .map(|row| row.get(x))
+            .flatten()
+            .map(|t| t.clone())
+            .expect("using the buffer's rectangle should always yield a tuxel")
     }
-}
 
-pub(crate) struct DrawBufferGuard<'a> {
-    inner: MutexGuard<'a, DrawBufferInner>,
-}
-
-impl<'a> DrawBufferGuard<'a> {
-    pub(crate) fn fill(&mut self, c: char) -> Result<()> {
-        let (skipx, takex, skipy, takey) = if self.inner.border {
+    fn fill(&mut self, c: char) -> Result<()> {
+        let (skipx, takex, skipy, takey) = if self.border {
             (
                 1usize,
-                self.inner.rectangle.width() - 2,
+                self.rectangle.width() - 2,
                 1usize,
-                self.inner.rectangle.height() - 2,
+                self.rectangle.height() - 2,
             )
         } else {
             (
                 0usize,
-                self.inner.rectangle.width(),
+                self.rectangle.width(),
                 0usize,
-                self.inner.rectangle.height(),
+                self.rectangle.height(),
             )
         };
-        for row in self.inner.buf.iter_mut().skip(skipy).take(takey) {
+        for row in self.buf.iter_mut().skip(skipy).take(takey) {
             for tuxel in row.iter_mut().skip(skipx).take(takex) {
                 tuxel.lock().set_content(c);
             }
@@ -433,11 +393,11 @@ impl<'a> DrawBufferGuard<'a> {
         Ok(())
     }
 
-    pub(crate) fn draw_border(&mut self) -> Result<()> {
+    fn draw_border(&mut self) -> Result<()> {
         let box_corner = boxy::Char::upper_left(boxy::Weight::Doubled);
         let box_horizontal = boxy::Char::horizontal(boxy::Weight::Doubled);
         let box_vertical = boxy::Char::vertical(boxy::Weight::Doubled);
-        if self.inner.buf.len() < 2 {
+        if self.buf.len() < 2 {
             // can only draw a border if there are at least two rows
             return Ok(());
         }
@@ -458,14 +418,13 @@ impl<'a> DrawBufferGuard<'a> {
 
         // draw non-corner top
         for tuxel in self
-            .inner
             .buf
             .iter()
             .nth(0)
             .expect("drawbuffer rows are always populated")
             .iter()
             .skip(1)
-            .take(self.inner.rectangle.width() - 2)
+            .take(self.rectangle.width() - 2)
         {
             tuxel
                 .clone()
@@ -475,14 +434,13 @@ impl<'a> DrawBufferGuard<'a> {
 
         // draw non-corner bottom
         for tuxel in self
-            .inner
             .buf
             .iter()
-            .nth(self.inner.rectangle.height() - 1)
+            .nth(self.rectangle.height() - 1)
             .expect("drawbuffer rows are always populated")
             .iter()
             .skip(1)
-            .take(self.inner.rectangle.width() - 2)
+            .take(self.rectangle.width() - 2)
         {
             tuxel
                 .clone()
@@ -492,13 +450,12 @@ impl<'a> DrawBufferGuard<'a> {
 
         // draw non-corner sides
         for row in self
-            .inner
             .buf
             .iter()
             // skip the first row
             .skip(1)
             // skip the last row
-            .take(self.inner.rectangle.height() - 2)
+            .take(self.rectangle.height() - 2)
         {
             row.iter()
                 .nth(0)
@@ -507,27 +464,67 @@ impl<'a> DrawBufferGuard<'a> {
                 .lock()
                 .set_content(box_vertical.clone().into());
             row.iter()
-                .nth(self.inner.rectangle.width() - 1)
+                .nth(self.rectangle.width() - 1)
                 .expect("drawbuffer rows are always populated")
                 .clone()
                 .lock()
                 .set_content(box_vertical.clone().into());
         }
 
-        self.inner.border = true;
+        self.border = true;
 
         Ok(())
     }
+}
 
-    fn get_tuxel(&mut self, pos: Position) -> Tuxel {
-        let (x, y) = self.inner.rectangle.relative_idx(&pos);
+#[derive(Clone, Default)]
+pub(crate) struct DrawBuffer {
+    inner: Arc<Mutex<DrawBufferInner>>,
+}
+
+impl DrawBuffer {
+    fn new(rectangle: Rectangle, buf: Vec<Vec<Tuxel>>, modifiers: SharedModifiers) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(DrawBufferInner {
+                rectangle,
+                border: false,
+                buf,
+                modifiers,
+            })),
+        }
+    }
+
+    pub(crate) fn modify(&mut self, modifier: Modifier) {
+        self.lock().modifiers.push(modifier)
+    }
+
+    pub(crate) fn draw_border(&mut self) -> Result<()> {
+        self.lock().draw_border()
+    }
+
+    pub(crate) fn fill(&mut self, c: char) -> Result<()> {
+        self.lock().fill(c)
+    }
+
+    pub(crate) fn write_left(&mut self, s: &str) -> Result<()> {
+        self.lock().write_left(s)
+    }
+
+    pub(crate) fn write_right(&mut self, s: &str) -> Result<()> {
+        self.lock().write_right(s)
+    }
+
+    pub(crate) fn write_center(&mut self, s: &str) -> Result<()> {
+        self.lock().write_center(s)
+    }
+}
+
+impl<'a> DrawBuffer {
+    fn lock(&'a self) -> MutexGuard<'a, DrawBufferInner> {
         self.inner
-            .buf
-            .get(y)
-            .map(|row| row.get(x))
-            .flatten()
-            .map(|t| t.clone())
-            .expect("using the buffer's rectangle should always yield a tuxel")
+            .as_ref()
+            .lock()
+            .expect("TODO: handle thread panicking better than this")
     }
 }
 
