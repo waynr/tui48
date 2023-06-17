@@ -1,6 +1,7 @@
 use std::io::Write;
 
 pub(crate) mod canvas;
+pub(crate) mod tuxel;
 use canvas::{Bounds2D, Canvas, DrawBuffer, Idx, Modifier, Rectangle};
 mod crossterm;
 
