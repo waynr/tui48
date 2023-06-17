@@ -378,7 +378,7 @@ impl DrawBuffer {
         let x_offset = if s.len() >= available_width {
             border_offset
         } else {
-            border_offset + ((available_width - s.len()) / 2 + (available_width - s.len()) % 2)
+            border_offset + ((available_width as f32 - s.len() as f32) / 2.0).ceil() as usize
         };
         for (idx, c) in s
             .chars()
