@@ -180,7 +180,7 @@ impl Stack {
         let clone = self.inner.clone();
         let mut inner = clone.lock().expect("lock unexpectedly poisoned");
         let tuxel = &mut inner.cells[idx.2];
-        tuxel.clone().lock().inner.shared_modifiers = shared_modifiers;
+        tuxel.clone().lock().shared_modifiers = shared_modifiers;
         Ok(tuxel.clone())
     }
 
@@ -208,56 +208,39 @@ struct TuxelInner {
     shared_modifiers: SharedModifiers,
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct Tuxel {
-    inner: Arc<Mutex<TuxelInner>>,
-}
-
-pub(crate) struct TuxelGuard<'a> {
-    inner: MutexGuard<'a, TuxelInner>,
-}
-
-impl<'a> TuxelGuard<'a> {
+impl TuxelInner {
     pub(crate) fn set_content(&mut self, c: char) {
-        self.inner.active = true;
-        self.inner.content = c;
+        self.active = true;
+        self.content = c;
     }
 
     pub(crate) fn coordinates(&self) -> (usize, usize) {
-        (self.inner.idx.0, self.inner.idx.1)
+        (self.idx.0, self.idx.1)
     }
 
     pub(crate) fn modifiers(&self) -> Vec<Modifier> {
-        let parent_modifiers = &mut self.inner.shared_modifiers.lock();
-        let mut modifiers: Vec<Modifier> = self.inner.modifiers.clone();
+        let parent_modifiers = &mut self.shared_modifiers.lock();
+        let mut modifiers: Vec<Modifier> = self.modifiers.clone();
         parent_modifiers.append(&mut modifiers);
         parent_modifiers.to_vec()
     }
 
     fn clear(&mut self) {
-        self.inner.content = ' ';
-        self.inner.modifiers.clear();
+        self.content = ' ';
+        self.modifiers.clear();
     }
 
     pub(crate) fn active(&self) -> bool {
-        self.inner.active
+        self.active
     }
 }
 
-impl std::fmt::Display for TuxelGuard<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.content)?;
-        Ok(())
-    }
+#[derive(Clone, Default)]
+pub(crate) struct Tuxel {
+    inner: Arc<Mutex<TuxelInner>>,
 }
 
-impl std::fmt::Display for Tuxel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.clone().lock().fmt(f)
-    }
-}
-
-impl<'a> Tuxel {
+impl Tuxel {
     fn new(idx: Idx) -> Self {
         Tuxel {
             inner: Arc::new(Mutex::new(TuxelInner {
@@ -273,13 +256,43 @@ impl<'a> Tuxel {
         }
     }
 
-    pub(crate) fn lock(&'a self) -> TuxelGuard<'a> {
-        TuxelGuard {
-            inner: self
-                .inner
-                .lock()
-                .expect("TODO: handle thread panicking better than this"),
-        }
+    pub(crate) fn content(&self) -> char {
+        self.lock().content
+    }
+
+    pub(crate) fn set_content(&mut self, c: char) {
+        self.lock().set_content(c)
+    }
+
+    pub(crate) fn coordinates(&self) -> (usize, usize) {
+        self.lock().coordinates()
+    }
+
+    pub(crate) fn modifiers(&self) -> Vec<Modifier> {
+        self.lock().modifiers()
+    }
+
+    fn clear(&mut self) {
+        self.lock().clear()
+    }
+
+    pub(crate) fn active(&self) -> bool {
+        self.lock().active()
+    }
+}
+
+impl<'a> Tuxel {
+    fn lock(&'a self) -> MutexGuard<'a, TuxelInner> {
+        self.inner
+            .lock()
+            .expect("TODO: handle thread panicking better than this")
+    }
+}
+
+impl std::fmt::Display for Tuxel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.content())?;
+        Ok(())
     }
 }
 
@@ -296,7 +309,7 @@ impl Drop for DrawBufferInner {
         for row in self.buf.iter_mut() {
             for mut tguard in row.iter_mut().map(|t| t.lock()) {
                 tguard.clear();
-                tguard.inner.shared_modifiers = SharedModifiers::default();
+                tguard.shared_modifiers = SharedModifiers::default();
             }
         }
     }
@@ -477,7 +490,6 @@ impl DrawBufferInner {
     }
 }
 
-#[derive(Clone, Default)]
 pub(crate) struct DrawBuffer {
     inner: Arc<Mutex<DrawBufferInner>>,
 }

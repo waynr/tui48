@@ -77,7 +77,6 @@ impl<T: Write> Renderer for Crossterm<T> {
             .with_context(|| "queue save cursor position")?;
         for result in c {
             let tuxel = result.with_context(|| "getting tuxel")?;
-            let tuxel = tuxel.lock();
             if tuxel.active() {
                 for command in tuxel.modifiers().iter() {
                     self.queue(command)
