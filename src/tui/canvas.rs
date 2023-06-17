@@ -382,7 +382,6 @@ impl DrawBuffer {
         };
         for (idx, c) in s
             .chars()
-            .rev()
             .enumerate()
             .take_while(|(idx, _)| *idx < available_width)
         {
