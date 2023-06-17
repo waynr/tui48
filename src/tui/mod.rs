@@ -1,16 +1,13 @@
-use std::io::Write;
-
 pub(crate) mod canvas;
 pub(crate) mod drawbuffer;
 pub(crate) mod tuxel;
 use canvas::{Canvas, Modifier};
 use drawbuffer::DrawBuffer;
-mod crossterm;
+pub(crate) mod crossterm;
 
 use crate::board::{Board, Direction};
 use crate::error::{Error, Result};
 use crate::round::Idx as BoardIdx;
-use crate::tui::crossterm::{next_event, size, Crossterm};
 
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
 #[derive(Clone, Default)]
@@ -63,8 +60,13 @@ pub(crate) enum Position {
 }
 
 pub(crate) trait Renderer {
+    fn size_hint(&self) -> Result<(u16, u16)>;
     fn render(&mut self, c: &Canvas) -> Result<()>;
     fn clear(&mut self, c: &Canvas) -> Result<()>;
+}
+
+pub(crate) trait EventSource {
+    fn next_event(&self) -> Result<Event>;
 }
 
 pub(crate) enum Event {
@@ -169,19 +171,21 @@ impl Tui48Board {
     }
 }
 
-pub(crate) struct Tui48 {
-    renderer: Box<dyn Renderer>,
+pub(crate) struct Tui48<R: Renderer, E: EventSource> {
+    renderer: R,
+    event_source: E,
     canvas: Canvas,
     board: Board,
     tui_board: Option<Tui48Board>,
 }
 
-impl Tui48 {
-    pub(crate) fn new<T: Write + 'static>(board: Board, w: Box<T>) -> Result<Self> {
-        let (width, height) = size()?;
+impl<R: Renderer, E: EventSource> Tui48<R, E> {
+    pub(crate) fn new(board: Board, renderer: R, event_source:E) -> Result<Self> {
+        let (width, height) = renderer.size_hint()?;
         Ok(Self {
             board,
-            renderer: Box::new(Crossterm::<T>::new(w)?),
+            renderer,
+            event_source,
             canvas: Canvas::new(width as usize, height as usize),
             tui_board: None,
         })
@@ -203,7 +207,7 @@ impl Tui48 {
 
             self.renderer.render(&self.canvas)?;
 
-            match next_event()? {
+            match self.event_source.next_event()? {
                 Event::UserInput(UserInput::Direction(d)) => self.shift(d)?,
                 Event::UserInput(UserInput::Quit) => break,
                 Event::Resize => {
@@ -221,9 +225,9 @@ impl Tui48 {
     }
 }
 
-impl Tui48 {
+impl<R: Renderer, E: EventSource> Tui48<R, E> {
     fn resize(&mut self) -> Result<()> {
-        let (width, height) = size()?;
+        let (width, height) = self.renderer.size_hint()?;
         self.canvas = Canvas::new(width as usize, height as usize);
         self.tui_board = match Tui48Board::new(&self.board, &mut self.canvas) {
             Ok(tb) => Some(tb),

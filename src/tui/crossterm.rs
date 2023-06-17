@@ -12,7 +12,7 @@ use crossterm::{
 use crate::board::Direction;
 use crate::error::Result;
 use crate::tui::canvas::Canvas;
-use crate::tui::{Event, Modifier, Renderer, UserInput};
+use crate::tui::{Event, EventSource, Modifier, Renderer, UserInput};
 
 pub(crate) struct Crossterm<T: Write> {
     w: Box<T>,
@@ -106,6 +106,10 @@ impl<T: Write> Renderer for Crossterm<T> {
         self.w.flush().with_context(|| "flush writer")?;
         Ok(())
     }
+
+    fn size_hint(&self) -> Result<(u16, u16)> {
+        size()
+    }
 }
 
 impl<T: Write> Crossterm<T> {
@@ -136,22 +140,26 @@ impl<T: Write> Crossterm<T> {
     }
 }
 
-pub(crate) fn size() -> Result<(u16, u16)> {
-    Ok(terminal::size().with_context(|| "get terminal size")?)
+#[derive(Default)]
+pub(crate) struct CrosstermEvents {}
+
+impl EventSource for CrosstermEvents {
+    fn next_event(&self) -> Result<Event> {
+        loop {
+            match event::read().with_context(|| "read crossterm events")? {
+                CrossTermEvent::Resize(_, _) => return Ok(Event::Resize),
+                CrossTermEvent::Key(ke) => match handle_key_event(ke) {
+                    Some(ke) => return Ok(Event::UserInput(ke)),
+                    None => continue,
+                },
+                _ => continue,
+            };
+        }
+    }
 }
 
-/// Block until the next Crossterm event.
-pub(crate) fn next_event() -> Result<Event> {
-    loop {
-        match event::read().with_context(|| "read crossterm events")? {
-            CrossTermEvent::Resize(_, _) => return Ok(Event::Resize),
-            CrossTermEvent::Key(ke) => match handle_key_event(ke) {
-                Some(ke) => return Ok(Event::UserInput(ke)),
-                None => continue,
-            },
-            _ => continue,
-        };
-    }
+fn size() -> Result<(u16, u16)> {
+    Ok(terminal::size().with_context(|| "get terminal size")?)
 }
 
 fn handle_key_event(ke: KeyEvent) -> Option<UserInput> {
