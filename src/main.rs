@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::io::stdout;
 
 use rand::thread_rng;
