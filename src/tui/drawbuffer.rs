@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use crate::error::Result;
 use crate::tui::canvas::{Modifier, SharedModifiers};
 use crate::tui::tuxel::Tuxel;
-use crate::tui::{Position, Rectangle};
+use crate::tui::geometry::{Position, Rectangle};
 
 #[derive(Default)]
 struct DrawBufferInner {

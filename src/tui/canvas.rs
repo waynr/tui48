@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use crate::error::Result;
 use crate::tui::tuxel::Tuxel;
 use crate::tui::drawbuffer::DrawBuffer;
-use crate::tui::{Idx, Bounds2D, Rectangle};
+use crate::tui::geometry::{Idx, Bounds2D, Rectangle};
 
 /// A 2d grid of `Cell`s.
 pub(crate) struct Canvas {
