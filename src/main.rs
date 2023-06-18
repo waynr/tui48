@@ -5,10 +5,11 @@ use rand::thread_rng;
 mod error;
 mod engine;
 mod tui;
+mod tui48;
 
 use engine::board::Board;
 use error::Result;
-use tui::Tui48;
+use tui48::Tui48;
 use tui::crossterm::{Crossterm, CrosstermEvents};
 
 fn main() -> Result<()> {

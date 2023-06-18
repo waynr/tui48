@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::Idx;
+use super::geometry::Idx;
 use super::canvas::{Modifier, SharedModifiers};
 
 #[derive(Clone, Default)]

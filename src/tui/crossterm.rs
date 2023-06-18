@@ -9,11 +9,10 @@ use crossterm::{
     terminal, ExecutableCommand, QueueableCommand,
 };
 
+use super::canvas::{Canvas, Modifier};
 use super::error::Result;
-use super::canvas::Canvas;
 use super::events::{Direction, Event, EventSource, UserInput};
 use super::renderer::Renderer;
-use super::Modifier;
 
 pub(crate) struct Crossterm<T: Write> {
     w: Box<T>,
