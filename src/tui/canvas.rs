@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::error::Result;
+use super::error::Result;
 use super::tuxel::Tuxel;
 use super::drawbuffer::DrawBuffer;
 use super::geometry::{Idx, Bounds2D, Rectangle};

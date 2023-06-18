@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::error::Result;
+use super::error::Result;
 use super::canvas::{Modifier, SharedModifiers};
 use super::tuxel::Tuxel;
 use super::geometry::{Position, Rectangle};

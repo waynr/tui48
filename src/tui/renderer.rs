@@ -1,4 +1,4 @@
-use crate::error::Result;
+use super::error::Result;
 use super::canvas::Canvas;
 
 pub(crate) trait Renderer {

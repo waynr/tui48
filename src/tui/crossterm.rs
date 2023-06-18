@@ -9,7 +9,7 @@ use crossterm::{
     terminal, ExecutableCommand, QueueableCommand,
 };
 
-use crate::error::Result;
+use super::error::Result;
 use super::canvas::Canvas;
 use super::events::{Direction, Event, EventSource, UserInput};
 use super::renderer::Renderer;

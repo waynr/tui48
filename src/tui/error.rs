@@ -1,10 +1,13 @@
 use thiserror;
 
 /// The Result type for tui48.
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Result<T> = std::result::Result<T, TuiError>;
 
 #[derive(thiserror::Error, Debug)]
-pub(crate) enum Error {
+pub(crate) enum TuiError {
+    #[error("terminal too small, required minimum size {0} x {1}")]
+    TerminalTooSmall(usize, usize),
+
     #[error("stack channel send failed")]
     MPSCSendError(#[from] std::sync::mpsc::SendError<crate::tui::canvas::Stack>),
 
@@ -15,11 +18,5 @@ pub(crate) enum Error {
     AnyhowError {
         #[from]
         source: anyhow::Error,
-    },
-
-    #[error("{source:?}")]
-    TuiError {
-        #[from]
-        source: crate::tui::error::TuiError,
     },
 }

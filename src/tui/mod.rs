@@ -5,11 +5,12 @@ pub(crate) mod tuxel;
 use canvas::{Canvas, Modifier};
 use drawbuffer::DrawBuffer;
 pub(crate) mod crossterm;
+pub(crate) mod error;
 pub(crate) mod events;
 pub(crate) mod renderer;
 
 use crate::engine::board::{Board, Direction as GameDirection};
-use crate::error::{Error, Result};
+use crate::tui::error::{TuiError, Result};
 use crate::engine::round::Idx as BoardIdx;
 use crate::tui::events::{Direction, Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Idx, Rectangle};
@@ -62,7 +63,7 @@ impl Tui48Board {
         let (cwidth, cheight) = canvas.dimensions();
         let (x_extent, y_extent) = board_rectangle.extents();
         if cwidth < x_extent || cheight < y_extent {
-            return Err(Error::TerminalTooSmall(cwidth, cheight));
+            return Err(TuiError::TerminalTooSmall(cwidth, cheight));
         }
 
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
@@ -176,7 +177,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         self.canvas = Canvas::new(width as usize, height as usize);
         self.tui_board = match Tui48Board::new(&self.board, &mut self.canvas) {
             Ok(tb) => Some(tb),
-            Err(Error::TerminalTooSmall(_, _)) => None,
+            Err(TuiError::TerminalTooSmall(_, _)) => None,
             Err(e) => return Err(e),
         };
         Ok(())

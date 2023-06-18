@@ -19,5 +19,5 @@ fn main() -> Result<()> {
     let event_source = CrosstermEvents::default();
     let tui48 = Tui48::new(board, renderer, event_source)?;
 
-    tui48.run()
+    Ok(tui48.run()?)
 }

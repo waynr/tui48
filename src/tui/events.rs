@@ -1,4 +1,4 @@
-use crate::error::Result;
+use super::error::Result;
 
 pub(crate) trait EventSource {
     fn next_event(&self) -> Result<Event>;
