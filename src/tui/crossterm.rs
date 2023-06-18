@@ -9,10 +9,11 @@ use crossterm::{
     terminal, ExecutableCommand, QueueableCommand,
 };
 
-use crate::board::Direction;
 use crate::error::Result;
 use crate::tui::canvas::Canvas;
-use crate::tui::{Event, EventSource, Modifier, Renderer, UserInput};
+use crate::tui::events::{Direction, Event, EventSource, UserInput};
+use crate::tui::renderer::Renderer;
+use crate::tui::Modifier;
 
 pub(crate) struct Crossterm<T: Write> {
     w: Box<T>,

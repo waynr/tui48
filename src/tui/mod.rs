@@ -1,35 +1,19 @@
 pub(crate) mod canvas;
 pub(crate) mod drawbuffer;
-pub(crate) mod tuxel;
 pub(crate) mod geometry;
+pub(crate) mod tuxel;
 use canvas::{Canvas, Modifier};
 use drawbuffer::DrawBuffer;
 pub(crate) mod crossterm;
+pub(crate) mod events;
+pub(crate) mod renderer;
 
-use crate::board::{Board, Direction};
+use crate::board::{Board, Direction as GameDirection};
 use crate::error::{Error, Result};
 use crate::round::Idx as BoardIdx;
-use crate::tui::geometry::{Idx, Bounds2D, Rectangle};
-
-pub(crate) trait Renderer {
-    fn size_hint(&self) -> Result<(u16, u16)>;
-    fn render(&mut self, c: &Canvas) -> Result<()>;
-    fn clear(&mut self, c: &Canvas) -> Result<()>;
-}
-
-pub(crate) trait EventSource {
-    fn next_event(&self) -> Result<Event>;
-}
-
-pub(crate) enum Event {
-    UserInput(UserInput),
-    Resize,
-}
-
-pub(crate) enum UserInput {
-    Direction(Direction),
-    Quit,
-}
+use crate::tui::events::{Direction, Event, EventSource, UserInput};
+use crate::tui::geometry::{Bounds2D, Idx, Rectangle};
+use crate::tui::renderer::Renderer;
 
 struct Tui48Board {
     _board: DrawBuffer,
@@ -132,7 +116,7 @@ pub(crate) struct Tui48<R: Renderer, E: EventSource> {
 }
 
 impl<R: Renderer, E: EventSource> Tui48<R, E> {
-    pub(crate) fn new(board: Board, renderer: R, event_source:E) -> Result<Self> {
+    pub(crate) fn new(board: Board, renderer: R, event_source: E) -> Result<Self> {
         let (width, height) = renderer.size_hint()?;
         Ok(Self {
             board,
@@ -177,6 +161,15 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     }
 }
 
+fn direction_to_game_direction(input: Direction) -> GameDirection {
+    match input {
+        Direction::Left => GameDirection::Left,
+        Direction::Right => GameDirection::Right,
+        Direction::Up => GameDirection::Up,
+        Direction::Down => GameDirection::Down,
+    }
+}
+
 impl<R: Renderer, E: EventSource> Tui48<R, E> {
     fn resize(&mut self) -> Result<()> {
         let (width, height) = self.renderer.size_hint()?;
@@ -190,6 +183,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     }
 
     fn shift(&mut self, direction: Direction) -> Result<()> {
+        let direction = direction_to_game_direction(direction);
         if let Some(_hint) = self.board.shift(direction) {
             let tb = self.tui_board.take();
             drop(tb);
