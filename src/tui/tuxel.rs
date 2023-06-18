@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::tui::Idx;
-use crate::tui::canvas::{Modifier, SharedModifiers};
+use super::Idx;
+use super::canvas::{Modifier, SharedModifiers};
 
 #[derive(Clone, Default)]
 struct TuxelInner {

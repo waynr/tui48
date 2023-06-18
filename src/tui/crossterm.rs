@@ -10,10 +10,10 @@ use crossterm::{
 };
 
 use crate::error::Result;
-use crate::tui::canvas::Canvas;
-use crate::tui::events::{Direction, Event, EventSource, UserInput};
-use crate::tui::renderer::Renderer;
-use crate::tui::Modifier;
+use super::canvas::Canvas;
+use super::events::{Direction, Event, EventSource, UserInput};
+use super::renderer::Renderer;
+use super::Modifier;
 
 pub(crate) struct Crossterm<T: Write> {
     w: Box<T>,

@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::tui::canvas::Canvas;
+use super::canvas::Canvas;
 
 pub(crate) trait Renderer {
     fn size_hint(&self) -> Result<(u16, u16)>;
