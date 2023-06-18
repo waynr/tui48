@@ -1,6 +1,6 @@
 use rand::rngs::ThreadRng;
 
-use crate::round::{AnimationHint, Round, Score};
+use super::round::{AnimationHint, Round, Score};
 
 /// Direction represents the direction indicated by the player.
 #[derive(Clone, Debug, Default)]

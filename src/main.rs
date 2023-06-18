@@ -2,12 +2,11 @@ use std::io::stdout;
 
 use rand::thread_rng;
 
-mod board;
 mod error;
-mod round;
+mod engine;
 mod tui;
 
-use board::Board;
+use engine::board::Board;
 use error::Result;
 use tui::Tui48;
 use tui::crossterm::{Crossterm, CrosstermEvents};

@@ -8,9 +8,9 @@ pub(crate) mod crossterm;
 pub(crate) mod events;
 pub(crate) mod renderer;
 
-use crate::board::{Board, Direction as GameDirection};
+use crate::engine::board::{Board, Direction as GameDirection};
 use crate::error::{Error, Result};
-use crate::round::Idx as BoardIdx;
+use crate::engine::round::Idx as BoardIdx;
 use crate::tui::events::{Direction, Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
