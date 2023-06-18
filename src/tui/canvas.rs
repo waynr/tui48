@@ -201,7 +201,7 @@ mod test {
         let result = canvas.get_layer(0);
         assert!(result.is_ok());
         let buffer = result.unwrap();
-        let inner = buffer.inner.lock().unwrap();
+        let inner = buffer.lock();
         assert_eq!(inner.buf.len(), dims.1);
         for row in &inner.buf {
             assert_eq!(row.len(), dims.0);
@@ -223,7 +223,7 @@ mod test {
         let mut canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
         let buffer = canvas.get_draw_buffer(rect.clone())?;
 
-        let inner = buffer.inner.lock().unwrap();
+        let inner = buffer.lock();
         assert_eq!(
             inner.buf.len(),
             rect.height(),
@@ -257,7 +257,7 @@ mod test {
     fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
         let tuxels = tuxel_buf_from_rectangle(&rect);
         let buf = DrawBuffer::new(rect.clone(), tuxels, SharedModifiers::default());
-        let inner = buf.inner.lock().unwrap();
+        let inner = buf.lock();
         assert_eq!(inner.buf.len(), rect.height());
         for row in &inner.buf {
             assert_eq!(row.len(), rect.width());

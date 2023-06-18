@@ -6,11 +6,11 @@ use super::tuxel::Tuxel;
 use super::geometry::{Position, Rectangle};
 
 #[derive(Default)]
-struct DrawBufferInner {
-    rectangle: Rectangle,
-    border: bool,
-    buf: Vec<Vec<Tuxel>>,
-    modifiers: SharedModifiers,
+pub(crate) struct DrawBufferInner {
+    pub(crate) rectangle: Rectangle,
+    pub(crate) border: bool,
+    pub(crate) buf: Vec<Vec<Tuxel>>,
+    pub(crate) modifiers: SharedModifiers,
 }
 
 impl Drop for DrawBufferInner {
@@ -229,7 +229,7 @@ impl DrawBuffer {
 }
 
 impl<'a> DrawBuffer {
-    fn lock(&'a self) -> MutexGuard<'a, DrawBufferInner> {
+    pub(crate) fn lock(&'a self) -> MutexGuard<'a, DrawBufferInner> {
         self.inner
             .as_ref()
             .lock()
