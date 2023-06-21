@@ -89,6 +89,21 @@ impl Canvas {
     fn get_stack(&mut self, idx: Idx) -> Result<Stack> {
         Ok(self.grid[idx.1][idx.0].clone())
     }
+
+    pub(crate) fn reclaim(&mut self) {
+        loop {
+            match self.tuxel_receiver.try_recv() {
+                Ok(tuxel) => {
+                    let idx = tuxel.idx();
+                    let _ = self.grid[idx.1][idx.0].replace(idx, Cell::Tuxel(tuxel));
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    unreachable!();
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+            }
+        }
+    }
 }
 
 impl Iterator for &Canvas {

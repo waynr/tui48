@@ -14,16 +14,6 @@ pub(crate) struct DrawBufferInner {
     pub(crate) modifiers: SharedModifiers,
 }
 
-impl Drop for DrawBufferInner {
-    fn drop(&mut self) {
-        for row in self.buf.iter_mut() {
-            for tuxel in row.iter_mut() {
-                tuxel.clear();
-            }
-        }
-    }
-}
-
 impl DrawBufferInner {
     fn write_left(&mut self, s: &str) -> Result<()> {
         let y = self.rectangle.height() / 2;
@@ -194,7 +184,6 @@ impl DrawBufferInner {
     }
 }
 
-#[derive(Clone)]
 pub(crate) struct DrawBuffer {
     inner: Arc<Mutex<DrawBufferInner>>,
     sender: Sender<Tuxel>,
@@ -278,26 +267,45 @@ impl<'a> DrawBuffer {
         let buf_idx = Idx(idx.0 - inner.rectangle.x(), idx.1 - inner.rectangle.y(), 0);
         inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
         DBTuxel {
-            parent: self.clone(),
+            parent: self.inner.clone(),
             idx,
             buf_idx,
         }
     }
 }
 
+impl Drop for DrawBuffer {
+    fn drop(&mut self) {
+        for row in self.lock().buf.iter_mut() {
+            while let Some(mut tuxel) = row.pop() {
+                tuxel.clear();
+                // can't do anything about send errors here -- we rely on the channel having the
+                // necessary capacity and the Canvas outliving all DrawBuffers
+                let _ = self.sender.send(tuxel);
+            }
+        }
+    }
+}
+
 pub(crate) struct DBTuxel {
-    parent: DrawBuffer,
+    parent: Arc<Mutex<DrawBufferInner>>,
     idx: Idx,
     buf_idx: Idx,
 }
 
 impl DBTuxel {
+    fn lock(&self) -> MutexGuard<DrawBufferInner> {
+        self.parent
+            .lock()
+            .expect("TODO: handle mutex lock errors more gracefully")
+    }
+
     pub(crate) fn content(&self) -> Result<char> {
-        self.parent.tuxel_content(self.buf_idx.0, self.buf_idx.1)
+        self.lock().tuxel_content(self.buf_idx.0, self.buf_idx.1)
     }
 
     pub(crate) fn active(&self) -> Result<bool> {
-        self.parent.tuxel_is_active(self.buf_idx.0, self.buf_idx.1)
+        self.lock().tuxel_is_active(self.buf_idx.0, self.buf_idx.1)
     }
 
     pub(crate) fn coordinates(&self) -> (usize, usize) {
@@ -305,6 +313,6 @@ impl DBTuxel {
     }
 
     pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
-        self.parent.tuxel_modifiers(self.buf_idx.0, self.buf_idx.1)
+        self.lock().tuxel_modifiers(self.buf_idx.0, self.buf_idx.1)
     }
 }
