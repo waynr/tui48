@@ -309,7 +309,7 @@ impl DBTuxel {
     }
 
     pub(crate) fn coordinates(&self) -> (usize, usize) {
-        (self.buf_idx.0, self.buf_idx.1)
+        (self.idx.0, self.idx.1)
     }
 
     pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
