@@ -366,4 +366,59 @@ mod test {
 
         Ok(())
     }
+
+    fn is_dbtuxel(cell: &Cell) -> bool {
+        match cell {
+            Cell::DBTuxel(..) => true,
+            _ => false,
+        }
+    }
+
+    fn is_tuxel(cell: &Cell) -> bool {
+        match cell {
+            Cell::Tuxel(..) => true,
+            _ => false,
+        }
+    }
+
+    #[rstest]
+    #[case::base((5, 5), rectangle(0, 0, 0, 5, 5))]
+    #[case::realistic((274, 75), rectangle(0, 0, 0, 274, 75))]
+    #[case::realistic_smaller_buffer((274, 75), rectangle(10, 10, 0, 10, 10))]
+    fn validate_tuxel_reclaim(
+        #[case] canvas_dims: (usize, usize),
+        #[case] rect: Rectangle,
+    ) -> Result<()> {
+        let mut canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
+        let dbuf = canvas.get_draw_buffer(rect.clone())?;
+
+        let mut idxs: Vec<Idx> = Vec::new();
+        {
+            let inner = dbuf.lock();
+            for row in &inner.buf {
+                for tuxel in row {
+                    let idx = tuxel.idx();
+                    let cell = &canvas.grid[idx.1][idx.0].lock().cells[idx.2];
+                    assert!(is_dbtuxel(cell));
+                    idxs.push(idx);
+                }
+            }
+        }
+
+        drop(dbuf);
+
+        for idx in idxs.iter() {
+            let cell = &canvas.grid[idx.1][idx.0].lock().cells[idx.2];
+            assert!(is_dbtuxel(cell));
+        }
+
+        canvas.reclaim();
+
+        for idx in idxs.iter() {
+            let cell = &canvas.grid[idx.1][idx.0].lock().cells[idx.2];
+            assert!(is_tuxel(cell));
+        }
+
+        Ok(())
+    }
 }
