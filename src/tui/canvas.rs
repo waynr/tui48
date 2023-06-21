@@ -134,7 +134,7 @@ impl Cell {
         match self {
             Cell::Tuxel(t) => Ok(t.content()),
             Cell::DBTuxel(b) => b.content(),
-            Cell::Empty => Ok('x'),
+            Cell::Empty => Ok('\u{2622}'),
         }
     }
 
@@ -275,11 +275,11 @@ impl std::fmt::Display for Stack {
                         write!(f, "{}", c)
                     }
                     // show radioactive symbol if we can't find a character to show
-                    Err(_) => write!(f, "x"),
+                    Err(_) => write!(f, "\u{2622}"),
                 }
             }
             // show radioactive symbol if we can't find a character to show
-            None => write!(f, "x"),
+            None => return Ok(())
         }
     }
 }
