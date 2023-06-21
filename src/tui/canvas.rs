@@ -10,8 +10,12 @@ use super::tuxel::Tuxel;
 pub(crate) struct Canvas {
     grid: Vec<Vec<Stack>>,
     rectangle: Rectangle,
-    receiver: Receiver<Idx>,
-    sender: Sender<Idx>,
+
+    idx_receiver: Receiver<Idx>,
+    idx_sender: Sender<Idx>,
+
+    tuxel_receiver: Receiver<Tuxel>,
+    tuxel_sender: Sender<Tuxel>,
 }
 
 impl Canvas {
@@ -25,12 +29,15 @@ impl Canvas {
             }
             grid.push(row);
         }
-        let (sender, receiver) = channel();
+        let (idx_sender, idx_receiver) = channel();
+        let (tuxel_sender, tuxel_receiver) = channel();
         let mut s = Self {
             grid,
             rectangle,
-            sender,
-            receiver,
+            idx_sender,
+            idx_receiver,
+            tuxel_sender,
+            tuxel_receiver,
         };
         s.draw_all().expect("enqueuing entire canvas rerender");
 
@@ -39,7 +46,7 @@ impl Canvas {
 
     pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
         let modifiers = SharedModifiers::default();
-        let mut dbuf = DrawBuffer::new(r.clone(), modifiers.clone());
+        let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), modifiers.clone());
         for (buf_y, (y, row)) in self
             .grid
             .iter_mut()
@@ -69,7 +76,7 @@ impl Canvas {
     pub(crate) fn draw_all(&mut self) -> Result<()> {
         for row in self.grid.iter_mut() {
             for stack in row.iter_mut() {
-                self.sender.send(stack.lock().idx.clone())?
+                self.idx_sender.send(stack.lock().idx.clone())?
             }
         }
         Ok(())
@@ -88,7 +95,7 @@ impl Iterator for &Canvas {
     type Item = Stack;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.receiver.try_recv() {
+            match self.idx_receiver.try_recv() {
                 Ok(idx) => return Some(self.grid[idx.1][idx.0].clone()),
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     unreachable!();
@@ -365,7 +372,8 @@ mod test {
     #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
     fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
         let tuxels = tuxel_buf_from_rectangle(&rect);
-        let mut db = DrawBuffer::new(rect.clone(), SharedModifiers::default());
+        let (sender, _) = channel();
+        let mut db = DrawBuffer::new(sender, rect.clone(), SharedModifiers::default());
         db.set_buf(tuxels)?;
         let inner = db.lock();
         assert_eq!(inner.buf.len(), rect.height());

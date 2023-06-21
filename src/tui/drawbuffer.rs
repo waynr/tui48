@@ -1,3 +1,4 @@
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Modifier, SharedModifiers};
@@ -196,10 +197,15 @@ impl DrawBufferInner {
 #[derive(Clone)]
 pub(crate) struct DrawBuffer {
     inner: Arc<Mutex<DrawBufferInner>>,
+    sender: Sender<Tuxel>,
 }
 
 impl DrawBuffer {
-    pub(crate) fn new(rectangle: Rectangle, modifiers: SharedModifiers) -> Self {
+    pub(crate) fn new(
+        sender: Sender<Tuxel>,
+        rectangle: Rectangle,
+        modifiers: SharedModifiers,
+    ) -> Self {
         let mut buf: Vec<_> = Vec::with_capacity(rectangle.height());
         for _ in 0..rectangle.height() {
             let row: Vec<Tuxel> = Vec::with_capacity(rectangle.width());
@@ -212,6 +218,7 @@ impl DrawBuffer {
                 buf,
                 modifiers,
             })),
+            sender,
         }
     }
 

@@ -11,8 +11,11 @@ pub(crate) enum TuiError {
     #[error("cell already owned")]
     CellAlreadyOwned,
 
-    #[error("stack channel send failed")]
-    MPSCSendError(#[from] std::sync::mpsc::SendError<crate::tui::geometry::Idx>),
+    #[error("idx channel send failed")]
+    IdxSendError(#[from] std::sync::mpsc::SendError<crate::tui::geometry::Idx>),
+
+    #[error("tuxel channel send failed")]
+    TuxelSendError(#[from] std::sync::mpsc::SendError<crate::tui::tuxel::Tuxel>),
 
     #[error("io error")]
     StdIOError(#[from] std::io::Error),
