@@ -38,12 +38,8 @@ impl Canvas {
     }
 
     pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
-        let mut buf: Vec<_> = Vec::with_capacity(r.height());
         let modifiers = SharedModifiers::default();
-        for _ in 0..r.height() {
-            let row: Vec<Tuxel> = Vec::with_capacity(r.width());
-            buf.push(row);
-        }
+        let mut dbuf = DrawBuffer::new(r.clone(), modifiers.clone());
         for (buf_y, (y, row)) in self
             .grid
             .iter_mut()
@@ -52,18 +48,17 @@ impl Canvas {
             .take(r.height())
             .enumerate()
         {
-            let buf_row = &mut buf[buf_y];
             for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
                 let canvas_idx = Idx(x, y, r.0 .2);
-                let cell = cellstack.acquire(canvas_idx, modifiers.clone())?;
+                let cell = cellstack.acquire(canvas_idx.clone(), modifiers.clone())?;
                 let tuxel = match cell {
                     Cell::Tuxel(t) => t,
                     _ => return Err(TuiError::CellAlreadyOwned),
                 };
-                buf_row.push(tuxel);
+                let db_tuxel = dbuf.push(tuxel);
+                cellstack.replace(canvas_idx, Cell::DBTuxel(db_tuxel));
             }
         }
-        let dbuf = DrawBuffer::new(r.clone(), buf, modifiers);
         Ok(dbuf)
     }
 
@@ -90,18 +85,11 @@ impl Canvas {
 }
 
 impl Iterator for &Canvas {
-    type Item = Result<Cell>;
+    type Item = Stack;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.receiver.try_recv() {
-                Ok(idx) => {
-                    let mut stack = self.grid[idx.1][idx.0].clone();
-                    //let mut stack = self.get_stack(idx).expect("meow");
-                    match stack.top() {
-                        Ok(Some(cell)) => return Some(Ok(cell)),
-                        _ => continue,
-                    }
-                }
+                Ok(idx) => return Some(self.grid[idx.1][idx.0].clone()),
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     unreachable!();
                 }
@@ -155,6 +143,10 @@ impl Cell {
     fn take(&mut self) -> Self {
         std::mem::take(self)
     }
+
+    fn replace(&mut self, other: Self) -> Self {
+        std::mem::replace(self, other)
+    }
 }
 
 impl std::fmt::Display for Cell {
@@ -203,32 +195,70 @@ impl Stack {
         Ok(self.lock().cells[idx.2].take())
     }
 
-    fn set(&mut self, idx: Idx, cell: Cell) -> Result<()> {
-        Ok(())
+    fn replace(&mut self, idx: Idx, cell: Cell) {
+        let _ = self.lock().cells[idx.2].replace(cell);
     }
 
-    fn top(&mut self) -> Result<Option<Cell>> {
-        let mut inner = self.lock();
-        let idx = inner
+    fn top(&self) -> Option<usize> {
+        self.lock()
             .cells
             // low-index elements of a stack are below high-index elements. we want to find the
             // first active tuxel on top of the stack so we iterate over elements in reverse
-            .iter_mut()
+            .iter()
             .enumerate()
             .rev()
             .find_map(|(idx, c)| match c.active() {
                 Ok(b) if b == true => Some(idx),
                 _ => None,
-            });
-
-        // TODO: finish implementing Stack::top
-        Ok(None)
+            })
     }
 
-    fn lock(&mut self) -> MutexGuard<StackInner> {
+    fn lock(&self) -> MutexGuard<StackInner> {
         self.inner
             .lock()
             .expect("TODO: handle mutex lock errors more gracefully")
+    }
+}
+
+impl Stack {
+    pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
+        if let Some(idx) = self.top() {
+            self.lock().cells[idx].modifiers()
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    pub(crate) fn coordinates(&self) -> (usize, usize) {
+        if let Some(idx) = self.top() {
+            self.lock().cells[idx].coordinates()
+        } else {
+            (0, 0)
+        }
+    }
+}
+
+impl std::fmt::Display for Stack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.top() {
+            Some(idx) => {
+                match self
+                    .lock()
+                    .cells
+                    .get(idx)
+                    .expect("if Stack.top() returns an index that element must exist")
+                    .get_content()
+                {
+                    Ok(c) => {
+                        write!(f, "{}", c)
+                    }
+                    // show radioactive symbol if we can't find a character to show
+                    Err(_) => write!(f, "x"),
+                }
+            }
+            // show radioactive symbol if we can't find a character to show
+            None => write!(f, "x"),
+        }
     }
 }
 
@@ -276,16 +306,15 @@ mod test {
     #[rstest]
     #[case::base((5, 5))]
     #[case::realistic((274, 75))]
-    fn get_layer_validate_draw_buffer_size(#[case] dims: (usize, usize)) {
+    fn get_layer_validate_draw_buffer_size(#[case] dims: (usize, usize)) -> Result<()> {
         let mut canvas = Canvas::new(dims.0, dims.1);
-        let result = canvas.get_layer(0);
-        assert!(result.is_ok());
-        let buffer = result.unwrap();
-        let inner = buffer.lock();
+        let dbuf = canvas.get_layer(0)?;
+        let inner = dbuf.lock();
         assert_eq!(inner.buf.len(), dims.1);
         for row in &inner.buf {
             assert_eq!(row.len(), dims.0);
         }
+        Ok(())
     }
 
     fn rectangle(x: usize, y: usize, z: usize, width: usize, height: usize) -> Rectangle {
@@ -336,8 +365,9 @@ mod test {
     #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
     fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
         let tuxels = tuxel_buf_from_rectangle(&rect);
-        let buf = DrawBuffer::new(rect.clone(), tuxels, SharedModifiers::default());
-        let inner = buf.lock();
+        let mut db = DrawBuffer::new(rect.clone(), SharedModifiers::default());
+        db.set_buf(tuxels)?;
+        let inner = db.lock();
         assert_eq!(inner.buf.len(), rect.height());
         for row in &inner.buf {
             assert_eq!(row.len(), rect.width());

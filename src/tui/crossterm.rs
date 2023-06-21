@@ -75,27 +75,24 @@ impl<T: Write> Renderer for Crossterm<T> {
         self.w
             .queue(cursor::SavePosition)
             .with_context(|| "queue save cursor position")?;
-        for result in c {
-            let cell = result.with_context(|| "getting tuxel")?;
-            if cell.active()? {
-                for command in cell.modifiers()?.iter() {
-                    self.queue(command)
-                        .with_context(|| "queue tuxel modifier")?;
-                }
-                let (x, y) = cell.coordinates();
-                self.w
-                    .queue(cursor::MoveTo(x as u16, y as u16))
-                    .with_context(|| "queue moving cursor")?;
-                self.w
-                    .queue(style::Print(format!("{}", &cell)))
-                    .with_context(|| "queue printing cell text")?;
-                self.w
-                    .queue(style::ResetColor)
-                    .with_context(|| "queue color reset")?;
-                self.w
-                    .queue(style::SetAttribute(style::Attribute::Reset))
-                    .with_context(|| "queue attribute reset")?;
-            };
+        for stack in c {
+            for command in stack.modifiers()?.iter() {
+                self.queue(command)
+                    .with_context(|| "queue tuxel modifier")?;
+            }
+            let (x, y) = stack.coordinates();
+            self.w
+                .queue(cursor::MoveTo(x as u16, y as u16))
+                .with_context(|| "queue moving cursor")?;
+            self.w
+                .queue(style::Print(format!("{}", &stack)))
+                .with_context(|| "queue printing cell text")?;
+            self.w
+                .queue(style::ResetColor)
+                .with_context(|| "queue color reset")?;
+            self.w
+                .queue(style::SetAttribute(style::Attribute::Reset))
+                .with_context(|| "queue attribute reset")?;
         }
         self.w
             .queue(cursor::RestorePosition)

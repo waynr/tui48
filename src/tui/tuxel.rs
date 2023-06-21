@@ -72,6 +72,10 @@ impl Tuxel {
         self.lock().coordinates()
     }
 
+    pub(crate) fn idx(&self) -> Idx {
+        self.lock().idx.clone()
+    }
+
     pub(crate) fn modifiers(&self) -> Vec<Modifier> {
         self.lock().modifiers()
     }
