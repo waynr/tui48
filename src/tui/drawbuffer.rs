@@ -1,9 +1,9 @@
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Modifier, SharedModifiers};
 use super::error::Result;
-use super::geometry::{Idx, Position, Rectangle};
+use super::geometry::{Bounds2D, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
 #[derive(Default)]
@@ -314,5 +314,60 @@ impl DBTuxel {
 
     pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
         self.lock().tuxel_modifiers(self.buf_idx.0, self.buf_idx.1)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rstest::*;
+
+    fn rectangle(x: usize, y: usize, z: usize, width: usize, height: usize) -> Rectangle {
+        Rectangle(Idx(x, y, z), Bounds2D(width, height))
+    }
+
+    fn tuxel_buf_from_rectangle(rect: &Rectangle) -> Vec<Vec<Tuxel>> {
+        let mut tuxels: Vec<Vec<Tuxel>> = Vec::new();
+        for y in 0..rect.height() {
+            let mut row: Vec<Tuxel> = Vec::new();
+            for x in 0..rect.width() {
+                let t = Tuxel::new(Idx(x, y, 0));
+                row.push(t);
+            }
+            tuxels.push(row);
+        }
+
+        tuxels
+    }
+
+    #[rstest]
+    #[case::base(rectangle(0, 0, 0, 5, 5))]
+    #[case::asymmetric(rectangle(0, 0, 0, 274, 75))]
+    #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
+    fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
+        let tuxels = tuxel_buf_from_rectangle(&rect);
+        let (sender, receiver) = channel();
+        let mut dbuf = DrawBuffer::new(sender.clone(), rect.clone(), SharedModifiers::default());
+        dbuf.set_buf(tuxels)?;
+        {
+            let inner = dbuf.lock();
+            assert_eq!(inner.buf.len(), rect.height());
+            for row in &inner.buf {
+                assert_eq!(row.len(), rect.width());
+            }
+        }
+        drop(dbuf);
+        let mut count = 0;
+        loop {
+            match receiver.try_recv() {
+                Ok(_) => count = count + 1,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    unreachable!();
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+            }
+        }
+        assert_eq!(count, rect.width() * rect.height());
+        Ok(())
     }
 }
