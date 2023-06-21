@@ -66,13 +66,12 @@ impl DrawBufferInner {
         Ok(())
     }
 
-    fn get_tuxel(&mut self, pos: Position) -> Tuxel {
+    fn get_tuxel(&mut self, pos: Position) -> &mut Tuxel {
         let (x, y) = self.rectangle.relative_idx(&pos);
         self.buf
-            .get(y)
-            .map(|row| row.get(x))
+            .get_mut(y)
+            .map(|row| row.get_mut(x))
             .flatten()
-            .map(|t| t.clone())
             .expect("using the buffer's rectangle should always yield a tuxel")
     }
 
@@ -122,47 +121,45 @@ impl DrawBufferInner {
         // draw non-corner top
         for tuxel in self
             .buf
-            .iter()
+            .iter_mut()
             .nth(0)
             .expect("drawbuffer rows are always populated")
-            .iter()
+            .iter_mut()
             .skip(1)
             .take(self.rectangle.width() - 2)
         {
-            tuxel.clone().set_content(box_horizontal.clone().into());
+            tuxel.set_content(box_horizontal.clone().into());
         }
 
         // draw non-corner bottom
         for tuxel in self
             .buf
-            .iter()
+            .iter_mut()
             .nth(self.rectangle.height() - 1)
             .expect("drawbuffer rows are always populated")
-            .iter()
+            .iter_mut()
             .skip(1)
             .take(self.rectangle.width() - 2)
         {
-            tuxel.clone().set_content(box_horizontal.clone().into());
+            tuxel.set_content(box_horizontal.clone().into());
         }
 
         // draw non-corner sides
         for row in self
             .buf
-            .iter()
+            .iter_mut()
             // skip the first row
             .skip(1)
             // skip the last row
             .take(self.rectangle.height() - 2)
         {
-            row.iter()
+            row.iter_mut()
                 .nth(0)
                 .expect("drawbuffer rows are always populated")
-                .clone()
                 .set_content(box_vertical.clone().into());
-            row.iter()
+            row.iter_mut()
                 .nth(self.rectangle.width() - 1)
                 .expect("drawbuffer rows are always populated")
-                .clone()
                 .set_content(box_vertical.clone().into());
         }
 
