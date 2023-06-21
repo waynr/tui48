@@ -57,9 +57,12 @@ impl Canvas {
         {
             for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
                 let canvas_idx = Idx(x, y, r.0 .2);
-                let cell = cellstack.acquire(canvas_idx.clone(), modifiers.clone())?;
+                let cell = cellstack.acquire(canvas_idx.clone())?;
                 let tuxel = match cell {
-                    Cell::Tuxel(t) => t,
+                    Cell::Tuxel(mut t) => {
+                        t.shared_modifiers = Some(modifiers.clone());
+                        t
+                    },
                     _ => return Err(TuiError::CellAlreadyOwned),
                 };
                 let db_tuxel = dbuf.push(tuxel);
@@ -84,10 +87,6 @@ impl Canvas {
 
     pub(crate) fn dimensions(&self) -> (usize, usize) {
         (self.rectangle.1 .0, self.rectangle.1 .1)
-    }
-
-    fn get_stack(&mut self, idx: Idx) -> Result<Stack> {
-        Ok(self.grid[idx.1][idx.0].clone())
     }
 
     pub(crate) fn reclaim(&mut self) {
@@ -213,7 +212,7 @@ impl Stack {
         }
     }
 
-    fn acquire(&mut self, idx: Idx, shared_modifiers: SharedModifiers) -> Result<Cell> {
+    fn acquire(&mut self, idx: Idx) -> Result<Cell> {
         Ok(self.lock().cells[idx.2].take())
     }
 

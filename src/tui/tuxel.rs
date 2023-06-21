@@ -9,34 +9,7 @@ pub(crate) struct Tuxel {
     content: char,
     idx: Idx,
     modifiers: Vec<Modifier>,
-    shared_modifiers: SharedModifiers,
-}
-
-impl Tuxel {
-    pub(crate) fn set_content(&mut self, c: char) {
-        self.active = true;
-        self.content = c;
-    }
-
-    pub(crate) fn coordinates(&self) -> (usize, usize) {
-        (self.idx.0, self.idx.1)
-    }
-
-    pub(crate) fn modifiers(&self) -> Vec<Modifier> {
-        let parent_modifiers = &mut self.shared_modifiers.lock();
-        let mut modifiers: Vec<Modifier> = self.modifiers.clone();
-        parent_modifiers.append(&mut modifiers);
-        parent_modifiers.to_vec()
-    }
-
-    pub(crate) fn clear(&mut self) {
-        self.content = ' ';
-        self.modifiers.clear();
-    }
-
-    pub(crate) fn active(&self) -> bool {
-        self.active
-    }
+    pub(crate) shared_modifiers: Option<SharedModifiers>,
 }
 
 impl Tuxel {
@@ -49,8 +22,36 @@ impl Tuxel {
             content: '-',
             idx,
             modifiers: Vec::new(),
-            shared_modifiers: SharedModifiers::default(),
+            shared_modifiers: None,
         }
+    }
+
+    pub(crate) fn set_content(&mut self, c: char) {
+        self.active = true;
+        self.content = c;
+    }
+
+    pub(crate) fn coordinates(&self) -> (usize, usize) {
+        (self.idx.0, self.idx.1)
+    }
+
+    pub(crate) fn modifiers(&self) -> Vec<Modifier> {
+        let mut modifiers = match &self.shared_modifiers {
+            Some(ms) => ms.lock().clone(),
+            None => Vec::new(),
+        };
+        modifiers.append(&mut self.modifiers.clone());
+        modifiers.to_vec()
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.content = ' ';
+        self.modifiers.clear();
+        self.shared_modifiers = None;
+    }
+
+    pub(crate) fn active(&self) -> bool {
+        self.active
     }
 
     pub(crate) fn content(&self) -> char {
