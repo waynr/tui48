@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::error::Result;
 use super::canvas::{Modifier, SharedModifiers};
+use super::error::Result;
+use super::geometry::{Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
-use super::geometry::{Position, Rectangle};
 
 #[derive(Default)]
 pub(crate) struct DrawBufferInner {
@@ -32,8 +32,7 @@ impl DrawBufferInner {
                 // can't write more than width of buffer
                 break;
             }
-            self.get_tuxel(Position::Idx(offset + x, y))
-                .set_content(c);
+            self.get_tuxel(Position::Idx(offset + x, y)).set_content(c);
         }
         Ok(())
     }
@@ -50,8 +49,7 @@ impl DrawBufferInner {
                 // can't write more than width of buffer
                 break;
             }
-            self.get_tuxel(Position::Idx(x - offset, y))
-                .set_content(c);
+            self.get_tuxel(Position::Idx(x - offset, y)).set_content(c);
         }
         Ok(())
     }
@@ -140,9 +138,7 @@ impl DrawBufferInner {
             .skip(1)
             .take(self.rectangle.width() - 2)
         {
-            tuxel
-                .clone()
-                .set_content(box_horizontal.clone().into());
+            tuxel.clone().set_content(box_horizontal.clone().into());
         }
 
         // draw non-corner bottom
@@ -155,9 +151,7 @@ impl DrawBufferInner {
             .skip(1)
             .take(self.rectangle.width() - 2)
         {
-            tuxel
-                .clone()
-                .set_content(box_horizontal.clone().into());
+            tuxel.clone().set_content(box_horizontal.clone().into());
         }
 
         // draw non-corner sides
@@ -185,14 +179,29 @@ impl DrawBufferInner {
 
         Ok(())
     }
+
+    fn tuxel_is_active(&self, x: usize, y: usize) -> Result<bool> {
+        // TODO: implement this
+        Ok(false)
+    }
+
+    fn tuxel_modifiers(&self, x: usize, y: usize) -> Result<Vec<Modifier>> {
+        // TODO: implement this
+        Ok(Vec::new())
+    }
 }
 
+#[derive(Clone)]
 pub(crate) struct DrawBuffer {
     inner: Arc<Mutex<DrawBufferInner>>,
 }
 
 impl DrawBuffer {
-    pub(crate) fn new(rectangle: Rectangle, buf: Vec<Vec<Tuxel>>, modifiers: SharedModifiers) -> Self {
+    pub(crate) fn new(
+        rectangle: Rectangle,
+        buf: Vec<Vec<Tuxel>>,
+        modifiers: SharedModifiers,
+    ) -> Self {
         Self {
             inner: Arc::new(Mutex::new(DrawBufferInner {
                 rectangle,
@@ -201,6 +210,11 @@ impl DrawBuffer {
                 modifiers,
             })),
         }
+    }
+
+    pub(crate) fn set_buf(&mut self, buf: Vec<Vec<Tuxel>>) -> Result<()> {
+        self.lock().buf = buf;
+        Ok(())
     }
 
     pub(crate) fn modify(&mut self, modifier: Modifier) {
@@ -226,6 +240,19 @@ impl DrawBuffer {
     pub(crate) fn write_center(&mut self, s: &str) -> Result<()> {
         self.lock().write_center(s)
     }
+
+    fn tuxel_content(&self, x: usize, y: usize) -> Result<char> {
+        // TODO: implement this
+        Ok('c')
+    }
+
+    fn tuxel_is_active(&self, x: usize, y: usize) -> Result<bool> {
+        self.lock().tuxel_is_active(x, y)
+    }
+
+    fn tuxel_modifiers(&self, x: usize, y: usize) -> Result<Vec<Modifier>> {
+        self.lock().tuxel_modifiers(x, y)
+    }
 }
 
 impl<'a> DrawBuffer {
@@ -237,3 +264,25 @@ impl<'a> DrawBuffer {
     }
 }
 
+pub(crate) struct DBTuxel {
+    parent: DrawBuffer,
+    idx: Idx,
+}
+
+impl DBTuxel {
+    pub(crate) fn content(&self) -> Result<char> {
+        self.parent.tuxel_content(self.idx.0, self.idx.1)
+    }
+
+    pub(crate) fn active(&self) -> Result<bool> {
+        self.parent.tuxel_is_active(self.idx.0, self.idx.1)
+    }
+
+    pub(crate) fn coordinates(&self) -> (usize, usize) {
+        (self.idx.0, self.idx.1)
+    }
+
+    pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
+        self.parent.tuxel_modifiers(self.idx.0, self.idx.1)
+    }
+}

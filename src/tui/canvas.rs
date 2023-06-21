@@ -1,17 +1,17 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::error::Result;
+use super::drawbuffer::{DBTuxel, DrawBuffer};
+use super::error::{Result, TuiError};
+use super::geometry::{Bounds2D, Idx, Rectangle};
 use super::tuxel::Tuxel;
-use super::drawbuffer::DrawBuffer;
-use super::geometry::{Idx, Bounds2D, Rectangle};
 
 /// A 2d grid of `Cell`s.
 pub(crate) struct Canvas {
     grid: Vec<Vec<Stack>>,
     rectangle: Rectangle,
-    receiver: Receiver<Stack>,
-    sender: Sender<Stack>,
+    receiver: Receiver<Idx>,
+    sender: Sender<Idx>,
 }
 
 impl Canvas {
@@ -55,7 +55,12 @@ impl Canvas {
             let buf_row = &mut buf[buf_y];
             for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
                 let canvas_idx = Idx(x, y, r.0 .2);
-                buf_row.push(cellstack.acquire(canvas_idx, modifiers.clone())?);
+                let cell = cellstack.acquire(canvas_idx, modifiers.clone())?;
+                let tuxel = match cell {
+                    Cell::Tuxel(t) => t,
+                    _ => return Err(TuiError::CellAlreadyOwned),
+                };
+                buf_row.push(tuxel);
             }
         }
         let dbuf = DrawBuffer::new(r.clone(), buf, modifiers);
@@ -67,9 +72,9 @@ impl Canvas {
     }
 
     pub(crate) fn draw_all(&mut self) -> Result<()> {
-        for row in self.grid.iter() {
-            for stack in row.iter() {
-                self.sender.send(stack.clone())?
+        for row in self.grid.iter_mut() {
+            for stack in row.iter_mut() {
+                self.sender.send(stack.lock().idx.clone())?
             }
         }
         Ok(())
@@ -78,17 +83,25 @@ impl Canvas {
     pub(crate) fn dimensions(&self) -> (usize, usize) {
         (self.rectangle.1 .0, self.rectangle.1 .1)
     }
+
+    fn get_stack(&mut self, idx: Idx) -> Result<Stack> {
+        Ok(self.grid[idx.1][idx.0].clone())
+    }
 }
 
 impl Iterator for &Canvas {
-    type Item = Result<Tuxel>;
+    type Item = Result<Cell>;
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.receiver.try_recv() {
-                Ok(stack) => match stack.top() {
-                    Ok(Some(tuxel)) => return Some(Ok(tuxel)),
-                    _ => continue,
-                },
+                Ok(idx) => {
+                    let mut stack = self.grid[idx.1][idx.0].clone();
+                    //let mut stack = self.get_stack(idx).expect("meow");
+                    match stack.top() {
+                        Ok(Some(cell)) => return Some(Ok(cell)),
+                        _ => continue,
+                    }
+                }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     unreachable!();
                 }
@@ -98,12 +111,68 @@ impl Iterator for &Canvas {
     }
 }
 
+#[derive(Default)]
+pub(crate) enum Cell {
+    #[default]
+    Empty,
+    Tuxel(Tuxel),
+    DBTuxel(DBTuxel),
+}
+
+impl Cell {
+    pub(crate) fn get_content(&self) -> Result<char> {
+        match self {
+            Cell::Tuxel(t) => Ok(t.content()),
+            Cell::DBTuxel(b) => b.content(),
+            Cell::Empty => Ok('x'),
+        }
+    }
+
+    pub(crate) fn active(&self) -> Result<bool> {
+        match self {
+            Cell::Tuxel(t) => Ok(t.active()),
+            Cell::DBTuxel(b) => b.active(),
+            Cell::Empty => Ok(false),
+        }
+    }
+
+    pub(crate) fn coordinates(&self) -> (usize, usize) {
+        match self {
+            Cell::Tuxel(t) => t.coordinates(),
+            Cell::DBTuxel(d) => d.coordinates(),
+            Cell::Empty => (0, 0),
+        }
+    }
+
+    pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
+        match self {
+            Cell::Tuxel(t) => Ok(t.modifiers()),
+            Cell::DBTuxel(d) => d.modifiers(),
+            Cell::Empty => Ok(Vec::new()),
+        }
+    }
+
+    fn take(&mut self) -> Self {
+        std::mem::take(self)
+    }
+}
+
+impl std::fmt::Display for Cell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get_content() {
+            Ok(v) => write!(f, "{}", v),
+            Err(e) => Ok(()),
+        }
+    }
+}
+
 /// A stack of `Cells`. Enables z-ordering of elements with occlusion and update detection. Tuxels
 /// are wrapped in a Arc<Mutex<_>> to allow them to be referenced by the higher level Widget
 /// abstraction at the same time.
 #[derive(Default)]
 struct StackInner {
-    cells: [Tuxel; 8],
+    cells: [Cell; 8],
+    idx: Idx,
 }
 
 #[derive(Clone, Default)]
@@ -115,40 +184,51 @@ impl Stack {
     fn new(x: usize, y: usize) -> Self {
         Self {
             inner: Arc::new(Mutex::new(StackInner {
+                idx: Idx(x, y, 0),
                 cells: [
-                    Tuxel::new(Idx(x, y, 0)),
-                    Tuxel::new(Idx(x, y, 1)),
-                    Tuxel::new(Idx(x, y, 2)),
-                    Tuxel::new(Idx(x, y, 3)),
-                    Tuxel::new(Idx(x, y, 4)),
-                    Tuxel::new(Idx(x, y, 5)),
-                    Tuxel::new(Idx(x, y, 6)),
-                    Tuxel::new(Idx(x, y, 7)),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 0))),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 1))),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 2))),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 3))),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 4))),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 5))),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 6))),
+                    Cell::Tuxel(Tuxel::new(Idx(x, y, 7))),
                 ],
             })),
         }
     }
 
-    fn acquire(&mut self, idx: Idx, shared_modifiers: SharedModifiers) -> Result<Tuxel> {
-        let clone = self.inner.clone();
-        let inner = clone.lock().expect("lock unexpectedly poisoned");
-        let tuxel = inner.cells[idx.2].clone();
-        tuxel.set_shared_modifiers(shared_modifiers.clone());
-        Ok(tuxel)
+    fn acquire(&mut self, idx: Idx, shared_modifiers: SharedModifiers) -> Result<Cell> {
+        Ok(self.lock().cells[idx.2].take())
     }
 
-    fn top(&self) -> Result<Option<Tuxel>> {
-        Ok(self
-            .inner
-            .lock()
-            .expect("TODO")
+    fn set(&mut self, idx: Idx, cell: Cell) -> Result<()> {
+        Ok(())
+    }
+
+    fn top(&mut self) -> Result<Option<Cell>> {
+        let mut inner = self.lock();
+        let idx = inner
             .cells
             // low-index elements of a stack are below high-index elements. we want to find the
             // first active tuxel on top of the stack so we iterate over elements in reverse
             .iter_mut()
+            .enumerate()
             .rev()
-            .find(|t| t.active())
-            .map(|s| s.clone()))
+            .find_map(|(idx, c)| match c.active() {
+                Ok(b) if b == true => Some(idx),
+                _ => None,
+            });
+
+        // TODO: finish implementing Stack::top
+        Ok(None)
+    }
+
+    fn lock(&mut self) -> MutexGuard<StackInner> {
+        self.inner
+            .lock()
+            .expect("TODO: handle mutex lock errors more gracefully")
     }
 }
 

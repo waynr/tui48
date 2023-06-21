@@ -76,19 +76,19 @@ impl<T: Write> Renderer for Crossterm<T> {
             .queue(cursor::SavePosition)
             .with_context(|| "queue save cursor position")?;
         for result in c {
-            let tuxel = result.with_context(|| "getting tuxel")?;
-            if tuxel.active() {
-                for command in tuxel.modifiers().iter() {
+            let cell = result.with_context(|| "getting tuxel")?;
+            if cell.active()? {
+                for command in cell.modifiers()?.iter() {
                     self.queue(command)
                         .with_context(|| "queue tuxel modifier")?;
                 }
-                let (x, y) = tuxel.coordinates();
+                let (x, y) = cell.coordinates();
                 self.w
                     .queue(cursor::MoveTo(x as u16, y as u16))
                     .with_context(|| "queue moving cursor")?;
                 self.w
-                    .queue(style::Print(format!("{}", &tuxel)))
-                    .with_context(|| "queue printing tuxel text")?;
+                    .queue(style::Print(format!("{}", &cell)))
+                    .with_context(|| "queue printing cell text")?;
                 self.w
                     .queue(style::ResetColor)
                     .with_context(|| "queue color reset")?;
