@@ -85,26 +85,6 @@ impl Round {
             .get(idx.0)
             .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
-}
-
-// private methods
-impl Round {
-    fn iter_mut(&self, direction: Direction) -> Indices {
-        Indices::new(self, direction)
-    }
-
-    fn get_mut(&mut self, idx: &Idx) -> &mut Card {
-        self.slots
-            .get_mut(idx.1)
-            .expect(format!("invalid y coordinate {}", idx.1).as_str())
-            .get_mut(idx.0)
-            .expect(format!("invalid x coordinate {}", idx.0).as_str())
-    }
-
-    fn set(&mut self, idx: &Idx, value: Card) {
-        let rf = self.get_mut(idx);
-        *rf = value;
-    }
 
     pub fn shift<T: Rng>(&mut self, mut rng: T, direction: &Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::default();
@@ -158,6 +138,26 @@ impl Round {
         } else {
             None
         }
+    }
+}
+
+// private methods
+impl Round {
+    fn iter_mut(&self, direction: Direction) -> Indices {
+        Indices::new(self, direction)
+    }
+
+    fn get_mut(&mut self, idx: &Idx) -> &mut Card {
+        self.slots
+            .get_mut(idx.1)
+            .expect(format!("invalid y coordinate {}", idx.1).as_str())
+            .get_mut(idx.0)
+            .expect(format!("invalid x coordinate {}", idx.0).as_str())
+    }
+
+    fn set(&mut self, idx: &Idx, value: Card) {
+        let rf = self.get_mut(idx);
+        *rf = value;
     }
 }
 
