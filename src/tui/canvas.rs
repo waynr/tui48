@@ -45,6 +45,7 @@ impl Canvas {
     }
 
     pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
+        self.reclaim();
         let modifiers = SharedModifiers::default();
         let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), modifiers.clone());
         for (y, row) in self
@@ -88,7 +89,7 @@ impl Canvas {
         (self.rectangle.1 .0, self.rectangle.1 .1)
     }
 
-    pub(crate) fn reclaim(&mut self) {
+    fn reclaim(&mut self) {
         loop {
             match self.tuxel_receiver.try_recv() {
                 Ok(tuxel) => {

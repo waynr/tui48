@@ -144,7 +144,6 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     match message_buf.take() {
                         Some(b) => {
                             drop(b);
-                            self.canvas.reclaim();
                         },
                         None => (),
                     };
@@ -183,7 +182,6 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         if let Some(_hint) = self.board.shift(direction) {
             let tb = self.tui_board.take();
             drop(tb);
-            self.canvas.reclaim();
             self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
         }
         Ok(())
