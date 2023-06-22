@@ -47,13 +47,12 @@ impl Canvas {
     pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
         let modifiers = SharedModifiers::default();
         let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), modifiers.clone());
-        for (buf_y, (y, row)) in self
+        for (y, row) in self
             .grid
             .iter_mut()
             .enumerate()
             .skip(r.y())
             .take(r.height())
-            .enumerate()
         {
             for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
                 let canvas_idx = Idx(x, y, r.0 .2);
@@ -174,7 +173,7 @@ impl std::fmt::Display for Cell {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.get_content() {
             Ok(v) => write!(f, "{}", v),
-            Err(e) => Ok(()),
+            Err(_) => Ok(()),
         }
     }
 }

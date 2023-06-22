@@ -1,9 +1,9 @@
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Modifier, SharedModifiers};
 use super::error::Result;
-use super::geometry::{Bounds2D, Idx, Position, Rectangle};
+use super::geometry::{Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
 #[derive(Default)]
@@ -208,10 +208,6 @@ impl DrawBuffer {
         }
     }
 
-    pub(crate) fn set_buf(&mut self, buf: Vec<Vec<Tuxel>>) -> Result<()> {
-        self.lock().buf = buf;
-        Ok(())
-    }
 
     pub(crate) fn modify(&mut self, modifier: Modifier) {
         self.lock().modifiers.push(modifier)
@@ -235,18 +231,6 @@ impl DrawBuffer {
 
     pub(crate) fn write_center(&mut self, s: &str) -> Result<()> {
         self.lock().write_center(s)
-    }
-
-    fn tuxel_content(&self, x: usize, y: usize) -> Result<char> {
-        self.lock().tuxel_content(x, y)
-    }
-
-    fn tuxel_is_active(&self, x: usize, y: usize) -> Result<bool> {
-        self.lock().tuxel_is_active(x, y)
-    }
-
-    fn tuxel_modifiers(&self, x: usize, y: usize) -> Result<Vec<Modifier>> {
-        self.lock().tuxel_modifiers(x, y)
     }
 }
 

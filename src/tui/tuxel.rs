@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex, MutexGuard};
-
 use super::canvas::{Modifier, SharedModifiers};
 use super::geometry::Idx;
 
