@@ -9,13 +9,20 @@ use super::board::Direction;
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
 #[derive(Default)]
+pub(crate) enum Hint {
+    #[default]
+    None,
+    ToIdx(Idx),
+}
+
+#[derive(Default)]
 pub(crate) struct AnimationHint {
-    hint: [[Option<Idx>; 4]; 4],
+    hint: [[Option<Hint>; 4]; 4],
     changed: bool,
 }
 
 impl AnimationHint {
-    fn get_mut(&mut self, idx: &Idx) -> &mut Option<Idx> {
+    fn get_mut(&mut self, idx: &Idx) -> &mut Option<Hint> {
         self.hint
             .get_mut(idx.1)
             .expect(format!("invalid y coordinate {}", idx.1).as_str())
@@ -23,7 +30,7 @@ impl AnimationHint {
             .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
 
-    fn set(&mut self, idx: &Idx, value: Idx) {
+    fn set(&mut self, idx: &Idx, value: Hint) {
         self.changed = true;
         let rf = self.get_mut(idx);
         *rf = Some(value);
@@ -106,7 +113,7 @@ impl Round {
                 if pivot == 0 {
                     self.set(pivot_idx, cmp);
                     self.set(cmp_idx, 0);
-                    hint.set(cmp_idx, pivot_idx.clone());
+                    hint.set(cmp_idx, Hint::ToIdx(pivot_idx.clone()));
                     continue;
                 }
                 // if the pivot element and the cmp element are equal then they must be combined;
@@ -115,7 +122,7 @@ impl Round {
                     self.score += cmp;
                     self.set(pivot_idx, pivot + cmp);
                     self.set(cmp_idx, 0);
-                    hint.set(cmp_idx, pivot_idx.clone());
+                    hint.set(cmp_idx, Hint::ToIdx(pivot_idx.clone()));
                 }
                 if let Some(idx) = pivot_iter.next() {
                     pivot_idx = idx;
