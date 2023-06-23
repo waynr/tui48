@@ -13,6 +13,7 @@ pub(crate) enum Hint {
     #[default]
     None,
     ToIdx(Idx),
+    NewFrom(Direction),
 }
 
 #[derive(Default)]
@@ -141,6 +142,7 @@ impl Round {
                 .expect("all rows are populated and at least one row has changed");
             let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(&mut rng)];
             self.set(idx, new_value);
+            hint.set(idx, Hint::NewFrom(direction.clone()));
             Some(hint)
         } else {
             None
