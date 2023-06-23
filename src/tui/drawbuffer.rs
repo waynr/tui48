@@ -1,17 +1,17 @@
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::canvas::{Modifier, SharedModifiers};
+use super::canvas::{Canvas, Modifier, SharedModifiers};
 use super::error::Result;
 use super::geometry::{Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
-#[derive(Default)]
 pub(crate) struct DrawBufferInner {
     pub(crate) rectangle: Rectangle,
     pub(crate) border: bool,
     pub(crate) buf: Vec<Vec<Tuxel>>,
     pub(crate) modifiers: SharedModifiers,
+    pub(crate) canvas: Canvas,
 }
 
 impl DrawBufferInner {
@@ -191,6 +191,7 @@ impl DrawBuffer {
         sender: Sender<Tuxel>,
         rectangle: Rectangle,
         modifiers: SharedModifiers,
+        canvas: Canvas,
     ) -> Self {
         let mut buf: Vec<_> = Vec::with_capacity(rectangle.height());
         for _ in 0..rectangle.height() {
@@ -203,6 +204,7 @@ impl DrawBuffer {
                 border: false,
                 buf,
                 modifiers,
+                canvas,
             })),
             sender,
         }

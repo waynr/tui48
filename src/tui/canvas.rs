@@ -18,10 +18,10 @@ struct CanvasInner {
 }
 
 impl CanvasInner {
-    fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
+    fn get_draw_buffer(&mut self, c: Canvas, r: Rectangle) -> Result<DrawBuffer> {
         self.reclaim();
         let modifiers = SharedModifiers::default();
-        let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), modifiers.clone());
+        let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), modifiers.clone(), c);
         for (y, row) in self
             .grid
             .iter_mut()
@@ -46,8 +46,8 @@ impl CanvasInner {
         Ok(dbuf)
     }
 
-    fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
-        self.get_draw_buffer(Rectangle(Idx(0, 0, z), self.rectangle.1.clone()))
+    fn get_layer(&mut self, c: Canvas, z: usize) -> Result<DrawBuffer> {
+        self.get_draw_buffer(c, Rectangle(Idx(0, 0, z), self.rectangle.1.clone()))
     }
 
     fn draw_all(&mut self) -> Result<()> {
@@ -94,6 +94,7 @@ impl CanvasInner {
 }
 
 /// A 2d grid of `Cell`s.
+#[derive(Clone)]
 pub(crate) struct Canvas {
     inner: Arc<Mutex<CanvasInner>>,
 }
@@ -133,11 +134,13 @@ impl Canvas {
     }
 
     pub(crate) fn get_draw_buffer(&self, r: Rectangle) -> Result<DrawBuffer> {
-        self.lock().get_draw_buffer(r)
+        let c = self.clone();
+        self.lock().get_draw_buffer(c, r)
     }
 
     pub(crate) fn get_layer(&self, z: usize) -> Result<DrawBuffer> {
-        self.lock().get_layer(z)
+        let c = self.clone();
+        self.lock().get_layer(c, z)
     }
 
     pub(crate) fn draw_all(&mut self) -> Result<()> {
