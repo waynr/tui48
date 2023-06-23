@@ -3,7 +3,7 @@ use rand::distributions::WeightedIndex;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 
-use super::board::Direction;
+use crate::tui::geometry::Direction;
 
 #[derive(Clone, Default)]
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);

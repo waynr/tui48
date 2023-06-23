@@ -48,3 +48,13 @@ pub(crate) enum Position {
     Idx(usize, usize),
 }
 
+/// Direction represents the direction indicated by the player.
+#[derive(Clone, Debug, Default)]
+pub(crate) enum Direction {
+    #[default]
+    Left,
+    Right,
+    Up,
+    Down,
+}
+

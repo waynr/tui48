@@ -11,7 +11,8 @@ use crossterm::{
 
 use super::canvas::{Canvas, Modifier};
 use super::error::Result;
-use super::events::{Direction, Event, EventSource, UserInput};
+use super::events::{Event, EventSource, UserInput};
+use super::geometry::Direction;
 use super::renderer::Renderer;
 
 pub(crate) struct Crossterm<T: Write> {

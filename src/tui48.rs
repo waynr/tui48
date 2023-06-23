@@ -1,11 +1,11 @@
-use crate::engine::board::{Board, Direction as GameDirection};
-use crate::engine::round::Idx as BoardIdx;
+use crate::engine::board::Board;
+use crate::engine::round::{AnimationHint, Idx as BoardIdx, Round};
 
-use crate::tui::error::{TuiError, Result};
 use crate::tui::canvas::{Canvas, Modifier};
 use crate::tui::drawbuffer::DrawBuffer;
-use crate::tui::events::{Direction, Event, EventSource, UserInput};
-use crate::tui::geometry::{Bounds2D, Idx, Rectangle};
+use crate::tui::error::{Result, TuiError};
+use crate::tui::events::{Event, EventSource, UserInput};
+use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
 
 struct Tui48Board {
@@ -144,7 +144,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     match message_buf.take() {
                         Some(b) => {
                             drop(b);
-                        },
+                        }
                         None => (),
                     };
                     self.renderer.clear(&self.canvas)?;
@@ -153,15 +153,6 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             self.canvas.draw_all()?;
         }
         Ok(())
-    }
-}
-
-fn direction_to_game_direction(input: Direction) -> GameDirection {
-    match input {
-        Direction::Left => GameDirection::Left,
-        Direction::Right => GameDirection::Right,
-        Direction::Up => GameDirection::Up,
-        Direction::Down => GameDirection::Down,
     }
 }
 

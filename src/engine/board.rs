@@ -1,17 +1,7 @@
 use rand::rngs::ThreadRng;
 
 use super::round::{AnimationHint, Round, Score};
-
-/// Direction represents the direction indicated by the player.
-#[derive(Clone, Debug, Default)]
-pub(crate) enum Direction {
-    #[default]
-    Left,
-    Right,
-    Up,
-    Down,
-}
-
+use crate::tui::geometry::Direction;
 /// Board represents a 2048 board that keeps track of the history of its game states.
 pub(crate) struct Board {
     rng: ThreadRng,
