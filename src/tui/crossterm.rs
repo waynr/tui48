@@ -75,7 +75,7 @@ impl<T: Write> Renderer for Crossterm<T> {
         self.w
             .queue(cursor::SavePosition)
             .with_context(|| "queue save cursor position")?;
-        for stack in c {
+        for stack in c.get_changed() {
             for command in stack.modifiers()?.iter() {
                 self.queue(command)
                     .with_context(|| "queue tuxel modifier")?;

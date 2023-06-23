@@ -6,8 +6,7 @@ use super::error::{Result, TuiError};
 use super::geometry::{Bounds2D, Idx, Rectangle};
 use super::tuxel::Tuxel;
 
-/// A 2d grid of `Cell`s.
-pub(crate) struct Canvas {
+struct CanvasInner {
     grid: Vec<Vec<Stack>>,
     rectangle: Rectangle,
 
@@ -18,33 +17,8 @@ pub(crate) struct Canvas {
     tuxel_sender: Sender<Tuxel>,
 }
 
-impl Canvas {
-    pub(crate) fn new(width: usize, height: usize) -> Self {
-        let rectangle = Rectangle(Idx(0, 0, 0), Bounds2D(width, height));
-        let mut grid: Vec<Vec<Stack>> = Vec::with_capacity(height);
-        for y in 0..height {
-            let mut row: Vec<Stack> = Vec::with_capacity(width);
-            for x in 0..width {
-                row.push(Stack::new(x, y));
-            }
-            grid.push(row);
-        }
-        let (idx_sender, idx_receiver) = channel();
-        let (tuxel_sender, tuxel_receiver) = channel();
-        let mut s = Self {
-            grid,
-            rectangle,
-            idx_sender,
-            idx_receiver,
-            tuxel_sender,
-            tuxel_receiver,
-        };
-        s.draw_all().expect("enqueuing entire canvas rerender");
-
-        s
-    }
-
-    pub(crate) fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
+impl CanvasInner {
+    fn get_draw_buffer(&mut self, r: Rectangle) -> Result<DrawBuffer> {
         self.reclaim();
         let modifiers = SharedModifiers::default();
         let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), modifiers.clone());
@@ -62,7 +36,7 @@ impl Canvas {
                     Cell::Tuxel(mut t) => {
                         t.shared_modifiers = Some(modifiers.clone());
                         t
-                    },
+                    }
                     _ => return Err(TuiError::CellAlreadyOwned),
                 };
                 let db_tuxel = dbuf.push(tuxel);
@@ -72,11 +46,11 @@ impl Canvas {
         Ok(dbuf)
     }
 
-    pub(crate) fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
+    fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
         self.get_draw_buffer(Rectangle(Idx(0, 0, z), self.rectangle.1.clone()))
     }
 
-    pub(crate) fn draw_all(&mut self) -> Result<()> {
+    fn draw_all(&mut self) -> Result<()> {
         for row in self.grid.iter_mut() {
             for stack in row.iter_mut() {
                 self.idx_sender.send(stack.lock().idx.clone())?
@@ -85,8 +59,22 @@ impl Canvas {
         Ok(())
     }
 
-    pub(crate) fn dimensions(&self) -> (usize, usize) {
+    fn dimensions(&self) -> (usize, usize) {
         (self.rectangle.1 .0, self.rectangle.1 .1)
+    }
+
+    fn get_changed(&self) -> Vec<Stack> {
+        let mut stacks = Vec::new();
+        loop {
+            match self.idx_receiver.try_recv() {
+                Ok(idx) => stacks.push(self.grid[idx.1][idx.0].clone()),
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    unreachable!();
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+            }
+        }
+        stacks
     }
 
     fn reclaim(&mut self) {
@@ -105,18 +93,63 @@ impl Canvas {
     }
 }
 
-impl Iterator for &Canvas {
-    type Item = Stack;
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.idx_receiver.try_recv() {
-                Ok(idx) => return Some(self.grid[idx.1][idx.0].clone()),
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    unreachable!();
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => return None,
+/// A 2d grid of `Cell`s.
+pub(crate) struct Canvas {
+    inner: Arc<Mutex<CanvasInner>>,
+}
+
+impl Canvas {
+    pub(crate) fn new(width: usize, height: usize) -> Self {
+        let rectangle = Rectangle(Idx(0, 0, 0), Bounds2D(width, height));
+        let mut grid: Vec<Vec<Stack>> = Vec::with_capacity(height);
+        for y in 0..height {
+            let mut row: Vec<Stack> = Vec::with_capacity(width);
+            for x in 0..width {
+                row.push(Stack::new(x, y));
             }
+            grid.push(row);
         }
+        let (idx_sender, idx_receiver) = channel();
+        let (tuxel_sender, tuxel_receiver) = channel();
+        let mut s = Self {
+            inner: Arc::new(Mutex::new(CanvasInner {
+                grid,
+                rectangle,
+                idx_sender,
+                idx_receiver,
+                tuxel_sender,
+                tuxel_receiver,
+            })),
+        };
+        s.draw_all().expect("enqueuing entire canvas rerender");
+
+        s
+    }
+
+    fn lock(&self) -> MutexGuard<CanvasInner> {
+        self.inner
+            .lock()
+            .expect("TODO: handle mutex lock errors more gracefully")
+    }
+
+    pub(crate) fn get_draw_buffer(&self, r: Rectangle) -> Result<DrawBuffer> {
+        self.lock().get_draw_buffer(r)
+    }
+
+    pub(crate) fn get_layer(&self, z: usize) -> Result<DrawBuffer> {
+        self.lock().get_layer(z)
+    }
+
+    pub(crate) fn draw_all(&mut self) -> Result<()> {
+        self.lock().draw_all()
+    }
+
+    pub(crate) fn dimensions(&self) -> (usize, usize) {
+        self.lock().dimensions()
+    }
+
+    pub(crate) fn get_changed(&self) -> Vec<Stack> {
+        self.lock().get_changed()
     }
 }
 
@@ -278,7 +311,7 @@ impl std::fmt::Display for Stack {
                 }
             }
             // show radioactive symbol if we can't find a character to show
-            None => return Ok(())
+            None => return Ok(()),
         }
     }
 }
