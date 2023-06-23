@@ -210,6 +210,17 @@ impl DrawBuffer {
         }
     }
 
+    pub(crate) fn push(&mut self, t: Tuxel) -> DBTuxel {
+        let mut inner = self.lock();
+        let idx = t.idx();
+        let buf_idx = Idx(idx.0 - inner.rectangle.x(), idx.1 - inner.rectangle.y(), 0);
+        inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
+        DBTuxel {
+            parent: self.inner.clone(),
+            idx,
+            buf_idx,
+        }
+    }
 
     pub(crate) fn modify(&mut self, modifier: Modifier) {
         self.lock().modifiers.push(modifier)
@@ -242,18 +253,6 @@ impl<'a> DrawBuffer {
             .as_ref()
             .lock()
             .expect("TODO: handle thread panicking better than this")
-    }
-
-    pub(crate) fn push(&mut self, t: Tuxel) -> DBTuxel {
-        let mut inner = self.lock();
-        let idx = t.idx();
-        let buf_idx = Idx(idx.0 - inner.rectangle.x(), idx.1 - inner.rectangle.y(), 0);
-        inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
-        DBTuxel {
-            parent: self.inner.clone(),
-            idx,
-            buf_idx,
-        }
     }
 }
 
