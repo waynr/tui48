@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use palette::{FromColor, Hsv, Srgb};
+use palette::{FromColor, Lch, Srgb};
 
 use crate::engine::board::Board;
 use crate::engine::round::Idx as BoardIdx;
@@ -148,76 +148,33 @@ pub(crate) fn init() -> Result<()> {
     let fg_hue = bg_hue + 180.0;
     let defaults = Colors {
         card_colors: HashMap::from_iter(
-            vec![
-                (
-                    2u16,
-                    Hsv::new(bg_hue, 0.0, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    4u16,
-                    Hsv::new(bg_hue, 0.1, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    8u16,
-                    Hsv::new(bg_hue, 0.2, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    16u16,
-                    Hsv::new(bg_hue, 0.3, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    32u16,
-                    Hsv::new(bg_hue, 0.4, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    64u16,
-                    Hsv::new(bg_hue, 0.5, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    128u16,
-                    Hsv::new(bg_hue, 0.6, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    256u16,
-                    Hsv::new(bg_hue, 0.7, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    512u16,
-                    Hsv::new(bg_hue, 0.8, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    1024u16,
-                    Hsv::new(bg_hue, 0.9, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-                (
-                    2046u16,
-                    Hsv::new(bg_hue, 0.99, 0.957),
-                    Hsv::new(fg_hue, 0.9, 0.5),
-                ),
-            ]
-            .into_iter()
-            .map(|(k, bg_hsv, fg_hsv)| {
-                (k, (Srgb::from_color(bg_hsv).into_format::<u8>(), Srgb::from_color(fg_hsv).into_format::<u8>()))
-            })
-            .map(|(k, (bg_rgb, fg_rgb))| {
-                (
-                    k,
+            (0..11)
+                .into_iter()
+                .map(|i| {
                     (
-                        Modifier::BackgroundColor(bg_rgb.red, bg_rgb.green, bg_rgb.blue),
-                        Modifier::ForegroundColor(fg_rgb.red, fg_rgb.green, fg_rgb.blue),
-                    ),
-                )
-            }),
+                        2u16.pow(i),
+                        Lch::new(80.0, 90.0, i as f32 * 360.0/10.0),
+                        Lch::new(20.0, 50.0, fg_hue),
+                    )
+                })
+                .map(|(k, bg_hsv, fg_hsv)| {
+                    (
+                        k,
+                        (
+                            Srgb::from_color(bg_hsv).into_format::<u8>(),
+                            Srgb::from_color(fg_hsv).into_format::<u8>(),
+                        ),
+                    )
+                })
+                .map(|(k, (bg_rgb, fg_rgb))| {
+                    (
+                        k,
+                        (
+                            Modifier::BackgroundColor(bg_rgb.red, bg_rgb.green, bg_rgb.blue),
+                            Modifier::ForegroundColor(fg_rgb.red, fg_rgb.green, fg_rgb.blue),
+                        ),
+                    )
+                }),
         ),
     };
     DEFAULT_COLORS
