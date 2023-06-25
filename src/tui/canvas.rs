@@ -31,7 +31,7 @@ impl CanvasInner {
         {
             for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
                 let canvas_idx = Idx(x, y, r.0 .2);
-                let cell = cellstack.acquire(canvas_idx.clone())?;
+                let cell = cellstack.acquire(canvas_idx.z());
                 let tuxel = match cell {
                     Cell::Tuxel(mut t) => {
                         t.shared_modifiers = Some(modifiers.clone());
@@ -40,7 +40,7 @@ impl CanvasInner {
                     _ => return Err(TuiError::CellAlreadyOwned),
                 };
                 let db_tuxel = dbuf.push(tuxel);
-                cellstack.replace(canvas_idx, Cell::DBTuxel(db_tuxel));
+                cellstack.replace(canvas_idx.z(), Cell::DBTuxel(db_tuxel));
             }
         }
         Ok(dbuf)
@@ -82,7 +82,7 @@ impl CanvasInner {
             match self.tuxel_receiver.try_recv() {
                 Ok(tuxel) => {
                     let idx = tuxel.idx();
-                    let _ = self.grid[idx.1][idx.0].replace(idx, Cell::Tuxel(tuxel));
+                    let _ = self.grid[idx.y()][idx.x()].replace(idx.z(), Cell::Tuxel(tuxel));
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     unreachable!();
@@ -90,6 +90,64 @@ impl CanvasInner {
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
             }
         }
+    }
+
+    fn acquire_cell(&mut self, idx: &Idx) -> Result<Cell> {
+        Ok(self.grid
+            .get_mut(idx.y())
+            .ok_or(TuiError::OutOfBoundsY(idx.y()))?
+            .get_mut(idx.x())
+            .ok_or(TuiError::OutOfBoundsX(idx.x()))?
+            .acquire(idx.z()))
+    }
+
+    fn replace_cell(&mut self, idx: &Idx, cell: Cell) -> Result<()> {
+        Ok(self.grid
+            .get_mut(idx.y())
+            .ok_or(TuiError::OutOfBoundsY(idx.y()))?
+            .get_mut(idx.x())
+            .ok_or(TuiError::OutOfBoundsX(idx.x()))?
+            .replace(idx.z(), cell))
+    }
+
+    fn swap_tuxels(&mut self, idx1: Idx, idx2: Idx) -> Result<()> {
+        self.rectangle.contains_or_err(&idx1)?;
+        self.rectangle.contains_or_err(&idx2)?;
+        let mut c1 = self.acquire_cell(&idx1)?;
+        let mut c2 = match self.acquire_cell(&idx2) {
+            Err(e) => {
+                // if we fail to get c2 we need to return c1
+                self.replace_cell(&idx1, c1)?;
+                return Err(e)
+            }
+            Ok(c) => c,
+        };
+
+        match &mut c1 {
+            Cell::Empty => (),
+            Cell::DBTuxel(ref mut dbt) => {
+                dbt.set_canvas_idx(&idx2);
+            },
+            Cell::Tuxel(ref mut t) => {
+                t.set_idx(&idx2);
+            },
+        }
+        match &mut c2 {
+            Cell::Empty => (),
+            Cell::DBTuxel(ref mut dbt) => {
+                dbt.set_canvas_idx(&idx1);
+            },
+            Cell::Tuxel(ref mut t) => {
+                t.set_idx(&idx1);
+            },
+        }
+
+        self.replace_cell(&idx1, c2)?;
+        self.replace_cell(&idx2, c1)?;
+        self.idx_sender.send(idx1)?;
+        self.idx_sender.send(idx2)?;
+
+        Ok(())
     }
 }
 
@@ -153,6 +211,10 @@ impl Canvas {
 
     pub(crate) fn get_changed(&self) -> Vec<Stack> {
         self.lock().get_changed()
+    }
+
+    pub(crate) fn swap_tuxels(&self, t1: Idx, t2: Idx) -> Result<()> {
+        self.lock().swap_tuxels(t1, t2)
     }
 }
 
@@ -248,12 +310,12 @@ impl Stack {
         }
     }
 
-    fn acquire(&mut self, idx: Idx) -> Result<Cell> {
-        Ok(self.lock().cells[idx.2].take())
+    fn acquire(&mut self, z: usize) -> Cell {
+        self.lock().cells[z].take()
     }
 
-    fn replace(&mut self, idx: Idx, cell: Cell) {
-        let _ = self.lock().cells[idx.2].replace(cell);
+    fn replace(&mut self, z: usize, cell: Cell) {
+        let _ = self.lock().cells[z].replace(cell);
     }
 
     fn top(&self) -> Option<usize> {

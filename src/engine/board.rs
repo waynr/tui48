@@ -36,8 +36,12 @@ impl Board {
         hint
     }
 
-    pub(crate) fn current(&self) -> &Round {
-        self.rounds.last().expect("a board must always have at least one round")
+    pub(crate) fn current(&self) -> Round {
+        self.rounds.last().expect("a board must always have at least one round").clone()
+    }
+
+    pub(crate) fn previous(&self) -> Option<Round> {
+        self.rounds.iter().rev().nth(2).cloned()
     }
 
     pub(crate) fn dimensions(&self) -> (usize, usize) {

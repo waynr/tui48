@@ -18,23 +18,18 @@ pub(crate) enum Hint {
 
 #[derive(Default)]
 pub(crate) struct AnimationHint {
-    hint: [[Option<Hint>; 4]; 4],
+    hint: Vec<(Idx, Hint)>,
     changed: bool,
 }
 
 impl AnimationHint {
-    fn get_mut(&mut self, idx: &Idx) -> &mut Option<Hint> {
-        self.hint
-            .get_mut(idx.1)
-            .expect(format!("invalid y coordinate {}", idx.1).as_str())
-            .get_mut(idx.0)
-            .expect(format!("invalid x coordinate {}", idx.0).as_str())
-    }
-
     fn set(&mut self, idx: &Idx, value: Hint) {
         self.changed = true;
-        let rf = self.get_mut(idx);
-        *rf = Some(value);
+        self.hint.push((idx.clone(), value));
+    }
+
+    pub(crate) fn hints(&self) -> Vec<(Idx, Hint)> {
+        Vec::new()
     }
 }
 

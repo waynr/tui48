@@ -85,6 +85,7 @@ impl Tui48Board {
                     let mut card_buffer = canvas.get_draw_buffer(Rectangle(idx, bounds))?;
                     card_buffer.draw_border()?;
                     card_buffer.fill(' ')?;
+                    card_buffer.modify(Modifier::Bold);
                     card_buffer.write_center(&format!("{}", value))?;
                     opt = Some(card_buffer);
                 }
@@ -100,8 +101,34 @@ impl Tui48Board {
     }
 }
 
+struct AnimatedTui48Board {
+    tui_board: Tui48Board,
+    animation_hint: AnimationHint,
+    round: Round,
+}
+
+impl AnimatedTui48Board {
+    fn new(tui_board: Tui48Board, animation_hint: AnimationHint, round: Round) -> Self {
+        Self {
+            tui_board,
+            animation_hint,
+            round,
+        }
+    }
+
+    fn animate(&mut self) -> bool {
+        let moving_tiles = self.animation_hint.hints().iter();
+        false
+    }
+
+    fn extract_board(self) -> Tui48Board {
+        self.tui_board
+    }
+}
+
 pub(crate) struct Tui48<R: Renderer, E: EventSource> {
     renderer: R,
+    redraw_entire: bool,
     event_source: E,
     canvas: Canvas,
     board: Board,
@@ -113,6 +140,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         let (width, height) = renderer.size_hint()?;
         Ok(Self {
             board,
+            redraw_entire: true,
             renderer,
             event_source,
             canvas: Canvas::new(width as usize, height as usize),
@@ -169,10 +197,24 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     }
 
     fn shift(&mut self, direction: Direction) -> Result<()> {
-        if let Some(_hint) = self.board.shift(direction) {
-            let tb = self.tui_board.take();
-            drop(tb);
-            self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
+        if let Some(hint) = self.board.shift(direction) {
+            if self.redraw_entire {
+                let tb = self.tui_board.take();
+                drop(tb);
+                self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
+            } else {
+                let mut animation = AnimatedTui48Board::new(
+                    self.tui_board
+                        .take()
+                        .expect("tui_board should always be Some at this point"),
+                    hint,
+                    self.board.current(),
+                );
+                while animation.animate() {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                self.tui_board = Some(animation.extract_board());
+            }
         }
         Ok(())
     }

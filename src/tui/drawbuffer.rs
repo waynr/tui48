@@ -2,8 +2,8 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Canvas, Modifier, SharedModifiers};
-use super::error::Result;
-use super::geometry::{Idx, Position, Rectangle};
+use super::error::{TuiError, Result};
+use super::geometry::{Direction, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
 pub(crate) struct DrawBufferInner {
@@ -168,6 +168,51 @@ impl DrawBufferInner {
         Ok(())
     }
 
+    fn translate(&mut self, magnitude: usize, dir: Direction) -> Result<()> {
+        match dir {
+            Direction::Left => {
+                for t in self.buf.iter_mut().flatten() {
+                    let current_idx = t.idx();
+                    let mut new_idx = current_idx.clone();
+                    new_idx.0 = new_idx.0 - magnitude;
+                    self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
+                }
+            }
+            Direction::Right => {
+                for t in self.buf.iter_mut().flatten().rev() {
+                    let current_idx = t.idx();
+                    let mut new_idx = current_idx.clone();
+                    new_idx.0 = new_idx.0 + magnitude;
+                    self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
+                }
+            }
+            Direction::Up => {
+                for t in self.buf.iter_mut().flatten() {
+                    let current_idx = t.idx();
+                    let mut new_idx = current_idx.clone();
+                    new_idx.1 = new_idx.1 - magnitude;
+                    self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
+                }
+            }
+            Direction::Down => {
+                for t in self.buf.iter_mut().flatten().rev() {
+                    let current_idx = t.idx();
+                    let mut new_idx = current_idx.clone();
+                    new_idx.1 = new_idx.1 + magnitude;
+                    self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// Tuxel-querying methods.
+impl DrawBufferInner {
     fn tuxel_is_active(&self, x: usize, y: usize) -> Result<bool> {
         Ok(self.buf[y][x].active())
     }
@@ -296,6 +341,10 @@ impl DBTuxel {
 
     pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
         self.lock().tuxel_modifiers(self.buf_idx.0, self.buf_idx.1)
+    }
+
+    pub(crate) fn set_canvas_idx(&mut self, idx: &Idx) {
+        self.idx = idx.clone()
     }
 }
 

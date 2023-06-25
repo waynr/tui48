@@ -11,6 +11,18 @@ pub(crate) enum TuiError {
     #[error("cell already owned")]
     CellAlreadyOwned,
 
+    #[error("{0}ward translation impossible")]
+    TranslationImpossible(super::geometry::Direction),
+
+    #[error("out of bounds x - {0}")]
+    OutOfBoundsX(usize),
+
+    #[error("out of bounds y - {0}")]
+    OutOfBoundsY(usize),
+
+    #[error("out of bounds z - {0}")]
+    OutOfBoundsZ(usize),
+
     #[error("idx channel send failed")]
     IdxSendError(#[from] std::sync::mpsc::SendError<crate::tui::geometry::Idx>),
 

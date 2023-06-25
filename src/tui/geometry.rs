@@ -1,6 +1,25 @@
+use super::error::{Result, TuiError};
+
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
 #[derive(Clone, Default)]
 pub(crate) struct Idx(pub usize, pub usize, pub usize);
+
+impl Idx {
+    #[inline(always)]
+    pub(crate) fn x(&self) -> usize {
+        self.0
+    }
+
+    #[inline(always)]
+    pub(crate) fn y(&self) -> usize {
+        self.1
+    }
+
+    #[inline(always)]
+    pub(crate) fn z(&self) -> usize {
+        self.2
+    }
+}
 
 #[derive(Clone, Default)]
 pub(crate) struct Bounds2D(pub usize, pub usize);
@@ -9,18 +28,22 @@ pub(crate) struct Bounds2D(pub usize, pub usize);
 pub(crate) struct Rectangle(pub Idx, pub Bounds2D);
 
 impl Rectangle {
+    #[inline(always)]
     pub(crate) fn width(&self) -> usize {
         self.1 .0
     }
 
+    #[inline(always)]
     pub(crate) fn height(&self) -> usize {
         self.1 .1
     }
 
+    #[inline(always)]
     pub(crate) fn x(&self) -> usize {
         self.0 .0
     }
 
+    #[inline(always)]
     pub(crate) fn y(&self) -> usize {
         self.0 .1
     }
@@ -35,8 +58,20 @@ impl Rectangle {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn extents(&self) -> (usize, usize) {
         (self.0 .0 + self.1 .0, self.0 .1 + self.1 .1)
+    }
+
+    #[inline(always)]
+    pub(crate) fn contains_or_err(&self, idx: &Idx) -> Result<()> {
+        if idx.x() < self.x() || idx.x() > self.x() + self.width() {
+            return Err(TuiError::OutOfBoundsY(idx.x()))
+        }
+        if idx.y() < self.y() || idx.y() > self.y() + self.height() {
+            return Err(TuiError::OutOfBoundsY(idx.y()))
+        }
+        Ok(())
     }
 }
 
@@ -58,3 +93,14 @@ pub(crate) enum Direction {
     Down,
 }
 
+impl std::fmt::Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Left => "left",
+            Self::Right => "right",
+            Self::Up => "up",
+            Self::Down => "down",
+        };
+        write!(f, "{}", s)
+    }
+}

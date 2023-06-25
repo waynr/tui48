@@ -59,11 +59,14 @@ impl Tuxel {
     pub(crate) fn idx(&self) -> Idx {
         self.idx.clone()
     }
+
+    pub(crate) fn set_idx(&mut self, idx: &Idx) {
+        self.idx = idx.clone()
+    }
 }
 
 impl std::fmt::Display for Tuxel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.content())?;
-        Ok(())
+        write!(f, "{}", self.content())
     }
 }
