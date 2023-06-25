@@ -9,7 +9,7 @@ mod tui48;
 
 use engine::board::Board;
 use error::Result;
-use tui48::Tui48;
+use tui48::{init, Tui48};
 use tui::crossterm::{Crossterm, CrosstermEvents};
 
 fn main() -> Result<()> {
@@ -19,6 +19,8 @@ fn main() -> Result<()> {
     let renderer = Crossterm::new(Box::new(w))?;
     let event_source = CrosstermEvents::default();
     let tui48 = Tui48::new(board, renderer, event_source)?;
+
+    init()?;
 
     Ok(tui48.run()?)
 }

@@ -22,4 +22,7 @@ pub(crate) enum Error {
         #[from]
         source: crate::tui::error::TuiError,
     },
+
+    #[error("default colors already set")]
+    DefaultColorsAlreadySet,
 }

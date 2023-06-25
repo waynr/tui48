@@ -1,9 +1,16 @@
-use crate::engine::board::Board;
-use crate::engine::round::{AnimationHint, Idx as BoardIdx, Round};
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
+use palette::{FromColor, Hsv, Srgb};
+
+use crate::engine::board::Board;
+use crate::engine::round::Idx as BoardIdx;
+use crate::engine::round::{AnimationHint, Round};
+
+use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
 use crate::tui::drawbuffer::DrawBuffer;
-use crate::tui::error::{Result, TuiError};
+use crate::tui::error::TuiError;
 use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
@@ -55,7 +62,7 @@ impl Tui48Board {
         let (cwidth, cheight) = canvas.dimensions();
         let (x_extent, y_extent) = board_rectangle.extents();
         if cwidth < x_extent || cheight < y_extent {
-            return Err(TuiError::TerminalTooSmall(cwidth, cheight));
+            return Err(TuiError::TerminalTooSmall(cwidth, cheight).into());
         }
 
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
@@ -83,6 +90,10 @@ impl Tui48Board {
                     let idx = Idx(x_offset + (2 + 6) * x, y_offset + (1 + 5) * y, 5);
                     let bounds = Bounds2D(6, 5);
                     let mut card_buffer = canvas.get_draw_buffer(Rectangle(idx, bounds))?;
+                    card_buffer.modify(Modifier::Bold);
+                    let colors = colors_from_value(value);
+                    card_buffer.modify(colors.0);
+                    card_buffer.modify(colors.1);
                     card_buffer.draw_border()?;
                     card_buffer.fill(' ')?;
                     card_buffer.modify(Modifier::Bold);
@@ -124,6 +135,109 @@ impl AnimatedTui48Board {
     fn extract_board(self) -> Tui48Board {
         self.tui_board
     }
+}
+
+struct Colors {
+    card_colors: HashMap<u16, (Modifier, Modifier)>,
+}
+
+static DEFAULT_COLORS: OnceLock<Colors> = OnceLock::new();
+
+pub(crate) fn init() -> Result<()> {
+    let bg_hue = 28.0;
+    let fg_hue = bg_hue + 180.0;
+    let defaults = Colors {
+        card_colors: HashMap::from_iter(
+            vec![
+                (
+                    2u16,
+                    Hsv::new(bg_hue, 0.0, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    4u16,
+                    Hsv::new(bg_hue, 0.1, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    8u16,
+                    Hsv::new(bg_hue, 0.2, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    16u16,
+                    Hsv::new(bg_hue, 0.3, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    32u16,
+                    Hsv::new(bg_hue, 0.4, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    64u16,
+                    Hsv::new(bg_hue, 0.5, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    128u16,
+                    Hsv::new(bg_hue, 0.6, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    256u16,
+                    Hsv::new(bg_hue, 0.7, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    512u16,
+                    Hsv::new(bg_hue, 0.8, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    1024u16,
+                    Hsv::new(bg_hue, 0.9, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+                (
+                    2046u16,
+                    Hsv::new(bg_hue, 0.99, 0.957),
+                    Hsv::new(fg_hue, 0.9, 0.5),
+                ),
+            ]
+            .into_iter()
+            .map(|(k, bg_hsv, fg_hsv)| {
+                (k, (Srgb::from_color(bg_hsv).into_format::<u8>(), Srgb::from_color(fg_hsv).into_format::<u8>()))
+            })
+            .map(|(k, (bg_rgb, fg_rgb))| {
+                (
+                    k,
+                    (
+                        Modifier::BackgroundColor(bg_rgb.red, bg_rgb.green, bg_rgb.blue),
+                        Modifier::ForegroundColor(fg_rgb.red, fg_rgb.green, fg_rgb.blue),
+                    ),
+                )
+            }),
+        ),
+    };
+    DEFAULT_COLORS
+        .set(defaults)
+        .or(Err(Error::DefaultColorsAlreadySet))?;
+    Ok(())
+}
+
+#[inline(always)]
+fn colors_from_value(value: u16) -> (Modifier, Modifier) {
+    let (background, foreground) = DEFAULT_COLORS
+        .get()
+        .expect("DEFAULT_COLORS should always be initialized by this point")
+        .card_colors
+        .get(&value)
+        .unwrap_or(&(
+            Modifier::BackgroundColor(255, 255, 255),
+            Modifier::ForegroundColor(90, 0, 0),
+        ));
+    (background.clone(), foreground.clone())
 }
 
 pub(crate) struct Tui48<R: Renderer, E: EventSource> {
@@ -190,7 +304,9 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         self.canvas = Canvas::new(width as usize, height as usize);
         self.tui_board = match Tui48Board::new(&self.board, &mut self.canvas) {
             Ok(tb) => Some(tb),
-            Err(TuiError::TerminalTooSmall(_, _)) => None,
+            Err(Error::TuiError {
+                source: TuiError::TerminalTooSmall(_, _),
+            }) => None,
             Err(e) => return Err(e),
         };
         Ok(())

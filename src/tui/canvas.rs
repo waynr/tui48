@@ -381,7 +381,7 @@ impl std::fmt::Display for Stack {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Modifier {
     ForegroundColor(u8, u8, u8),
     BackgroundColor(u8, u8, u8),
