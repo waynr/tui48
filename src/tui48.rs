@@ -169,7 +169,6 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     }
 
     fn shift(&mut self, direction: Direction) -> Result<()> {
-        let direction = direction_to_game_direction(direction);
         if let Some(_hint) = self.board.shift(direction) {
             let tb = self.tui_board.take();
             drop(tb);
