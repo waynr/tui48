@@ -29,6 +29,9 @@ pub(crate) enum TuiError {
     #[error("tuxel channel send failed")]
     TuxelSendError(#[from] std::sync::mpsc::SendError<crate::tui::tuxel::Tuxel>),
 
+    #[error("invalid translation")]
+    InvalidTranslation,
+
     #[error("io error")]
     StdIOError(#[from] std::io::Error),
 

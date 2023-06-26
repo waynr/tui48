@@ -2,7 +2,7 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Canvas, Modifier, SharedModifiers};
-use super::error::{TuiError, Result};
+use super::error::{Result, TuiError};
 use super::geometry::{Direction, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
@@ -73,6 +73,10 @@ impl DrawBufferInner {
             .map(|row| row.get_mut(x))
             .flatten()
             .expect("using the buffer's rectangle should always yield a tuxel")
+    }
+
+    fn rectangle(&self) -> Rectangle {
+        self.rectangle.clone()
     }
 
     fn fill(&mut self, c: char) -> Result<()> {
@@ -207,6 +211,7 @@ impl DrawBufferInner {
                 }
             }
         }
+        self.rectangle.translate(magnitude, dir)?;
         Ok(())
     }
 }
@@ -289,6 +294,10 @@ impl DrawBuffer {
 
     pub(crate) fn write_center(&mut self, s: &str) -> Result<()> {
         self.lock().write_center(s)
+    }
+
+    pub(crate) fn rectangle(&self) -> Rectangle {
+        self.lock().rectangle()
     }
 }
 

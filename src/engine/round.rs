@@ -8,7 +8,17 @@ use crate::tui::geometry::Direction;
 #[derive(Clone, Default)]
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
-#[derive(Default)]
+impl Idx {
+    pub(crate) fn x(&self) -> usize {
+        self.0
+    }
+
+    pub(crate) fn y(&self) -> usize {
+        self.1
+    }
+}
+
+#[derive(Clone, Default)]
 pub(crate) enum Hint {
     #[default]
     None,
@@ -29,7 +39,7 @@ impl AnimationHint {
     }
 
     pub(crate) fn hints(&self) -> Vec<(Idx, Hint)> {
-        Vec::new()
+        self.hint.clone()
     }
 }
 

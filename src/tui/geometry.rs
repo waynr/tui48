@@ -59,6 +59,18 @@ impl Rectangle {
     }
 
     #[inline(always)]
+    pub(crate) fn translate(&mut self, mag: usize, dir: Direction) -> Result<()> {
+        match dir {
+            Direction::Left if self.0 .0 != 0 => self.0 .0 = self.0 .0 - 1,
+            Direction::Right => self.0 .0 = self.0 .0 + 1,
+            Direction::Up if self.0 .1 != 0 => self.0 .1 = self.0 .1 - 1,
+            Direction::Down => self.0 .1 = self.0 .1 + 1,
+            _ => return Err(TuiError::InvalidTranslation),
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
     pub(crate) fn extents(&self) -> (usize, usize) {
         (self.0 .0 + self.1 .0, self.0 .1 + self.1 .1)
     }
@@ -66,10 +78,10 @@ impl Rectangle {
     #[inline(always)]
     pub(crate) fn contains_or_err(&self, idx: &Idx) -> Result<()> {
         if idx.x() < self.x() || idx.x() > self.x() + self.width() {
-            return Err(TuiError::OutOfBoundsY(idx.x()))
+            return Err(TuiError::OutOfBoundsY(idx.x()));
         }
         if idx.y() < self.y() || idx.y() > self.y() + self.height() {
-            return Err(TuiError::OutOfBoundsY(idx.y()))
+            return Err(TuiError::OutOfBoundsY(idx.y()));
         }
         Ok(())
     }

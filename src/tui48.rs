@@ -5,7 +5,7 @@ use palette::{FromColor, Lch, Srgb};
 
 use crate::engine::board::Board;
 use crate::engine::round::Idx as BoardIdx;
-use crate::engine::round::{AnimationHint, Round};
+use crate::engine::round::{AnimationHint, Hint, Round};
 
 use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
@@ -18,7 +18,7 @@ use crate::tui::renderer::Renderer;
 struct Tui48Board {
     _board: DrawBuffer,
     _score: DrawBuffer,
-    _slots: Vec<Vec<Option<DrawBuffer>>>,
+    slots: Vec<Vec<Option<DrawBuffer>>>,
 }
 
 /// Generates a 2048 TUI layout with legible numbers.
@@ -107,29 +107,69 @@ impl Tui48Board {
         Ok(Self {
             _board: board,
             _score: score,
-            _slots: slots,
+            slots,
         })
     }
 }
 
 struct AnimatedTui48Board {
+    canvas: Canvas,
+    new_tile: Option<DrawBuffer>,
     tui_board: Tui48Board,
     animation_hint: AnimationHint,
     round: Round,
 }
 
 impl AnimatedTui48Board {
-    fn new(tui_board: Tui48Board, animation_hint: AnimationHint, round: Round) -> Self {
+    fn new(
+        canvas: Canvas,
+        tui_board: Tui48Board,
+        animation_hint: AnimationHint,
+        round: Round,
+    ) -> Self {
         Self {
+            canvas,
+            new_tile: None,
             tui_board,
             animation_hint,
             round,
         }
     }
 
-    fn animate(&mut self) -> bool {
-        let moving_tiles = self.animation_hint.hints().iter();
-        false
+    fn animate(&mut self) -> Result<bool> {
+        let hints = self.animation_hint.hints();
+        for (idx, hint) in hints.iter().into_iter() {
+            let moving_db = &self.tui_board.slots[idx.y()][idx.x()]
+                .as_mut()
+                .ok_or(Error::UnableToRetrieveDrawBuffer);
+            let target_rectangle = match hint {
+                Hint::None => continue,
+                Hint::ToIdx(to_idx) => self.tui_board.slots[to_idx.y()][to_idx.x()]
+                    .as_mut()
+                    .ok_or(Error::UnableToRetrieveDrawBuffer)?
+                    .rectangle(),
+                Hint::NewFrom(from_dir) => {
+                    self.new_tile = Some(
+                        self.canvas
+                            .get_draw_buffer(Rectangle(Idx(0, 0, 0), Bounds2D(10, 10)))?,
+                    );
+                    let to_idx = idx;
+                    self.tui_board.slots[to_idx.y()][to_idx.x()]
+                        .as_mut()
+                        .ok_or(Error::UnableToRetrieveDrawBuffer)?
+                        .rectangle()
+                }
+            };
+        }
+        Ok(false)
+    }
+
+    fn animate_existing_tile(&mut self, from_dir: Direction) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn animate_new_tile(&mut self, from_dir: Direction) -> Result<bool> {
+        Ok(false)
     }
 
     fn extract_board(self) -> Tui48Board {
@@ -277,13 +317,14 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                 self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
             } else {
                 let mut animation = AnimatedTui48Board::new(
+                    self.canvas.clone(),
                     self.tui_board
                         .take()
                         .expect("tui_board should always be Some at this point"),
                     hint,
                     self.board.current(),
                 );
-                while animation.animate() {
+                while animation.animate()? {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                 }
                 self.tui_board = Some(animation.extract_board());
