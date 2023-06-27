@@ -67,14 +67,15 @@ impl Tui48Board {
 
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
         board.draw_border()?;
-        board.fill(' ')?;
 
         let mut score = canvas.get_draw_buffer(Rectangle(Idx(18, 1, 0), Bounds2D(10, 3)))?;
         score.draw_border()?;
         score.fill(' ')?;
         score.write_right(&format!("{}", game.score()))?;
-        score.modify(Modifier::BackgroundColor(255, 255, 255));
-        score.modify(Modifier::ForegroundColor(0, 0, 0));
+        score.modify(Modifier::SetBackgroundColor(75, 50, 25));
+        score.modify(Modifier::SetForegroundColor(0, 0, 0));
+        score.modify(Modifier::SetFGLightness(0.2));
+        score.modify(Modifier::SetBGLightness(0.8));
 
         let (width, height) = game.dimensions();
         let round = game.current();
@@ -90,13 +91,11 @@ impl Tui48Board {
                     let idx = Idx(x_offset + (2 + 6) * x, y_offset + (1 + 5) * y, 5);
                     let bounds = Bounds2D(6, 5);
                     let mut card_buffer = canvas.get_draw_buffer(Rectangle(idx, bounds))?;
-                    card_buffer.modify(Modifier::Bold);
                     let colors = colors_from_value(value);
                     card_buffer.modify(colors.0);
                     card_buffer.modify(colors.1);
                     card_buffer.draw_border()?;
                     card_buffer.fill(' ')?;
-                    card_buffer.modify(Modifier::Bold);
                     card_buffer.write_center(&format!("{}", value))?;
                     opt = Some(card_buffer);
                 }
@@ -104,6 +103,12 @@ impl Tui48Board {
             }
             slots.push(row);
         }
+
+        board.fill(' ')?;
+        board.modify(Modifier::SetBackgroundColor(40, 0, 0));
+        board.modify(Modifier::SetBGLightness(0.2));
+        board.modify(Modifier::SetForegroundColor(25, 50, 75));
+        board.modify(Modifier::SetFGLightness(0.6));
         Ok(Self {
             _board: board,
             _score: score,
@@ -178,6 +183,7 @@ impl AnimatedTui48Board {
 }
 
 struct Colors {
+    // TODO: change this from canvas::Modifer to colors::Rgb
     card_colors: HashMap<u16, (Modifier, Modifier)>,
 }
 
@@ -193,25 +199,23 @@ pub(crate) fn init() -> Result<()> {
                 .map(|i| {
                     (
                         2u16.pow(i),
-                        Lch::new(80.0, 90.0, i as f32 * 360.0/10.0),
+                        Lch::new(80.0, 90.0, i as f32 * 360.0 / 10.0),
                         Lch::new(20.0, 50.0, fg_hue),
                     )
                 })
                 .map(|(k, bg_hsv, fg_hsv)| {
                     (
                         k,
-                        (
-                            Srgb::from_color(bg_hsv).into_format::<u8>(),
-                            Srgb::from_color(fg_hsv).into_format::<u8>(),
-                        ),
+                        Srgb::from_color(bg_hsv).into_format::<u8>(),
+                        Srgb::from_color(fg_hsv).into_format::<u8>(),
                     )
                 })
-                .map(|(k, (bg_rgb, fg_rgb))| {
+                .map(|(k, bg_rgb, fg_rgb)| {
                     (
                         k,
                         (
-                            Modifier::BackgroundColor(bg_rgb.red, bg_rgb.green, bg_rgb.blue),
-                            Modifier::ForegroundColor(fg_rgb.red, fg_rgb.green, fg_rgb.blue),
+                            Modifier::SetBackgroundColor(bg_rgb.red, bg_rgb.green, bg_rgb.blue),
+                            Modifier::SetForegroundColor(fg_rgb.red, fg_rgb.green, fg_rgb.blue),
                         ),
                     )
                 }),
@@ -231,8 +235,8 @@ fn colors_from_value(value: u16) -> (Modifier, Modifier) {
         .card_colors
         .get(&value)
         .unwrap_or(&(
-            Modifier::BackgroundColor(255, 255, 255),
-            Modifier::ForegroundColor(90, 0, 0),
+            Modifier::SetBackgroundColor(255, 255, 255),
+            Modifier::SetForegroundColor(90, 0, 0),
         ));
     (background.clone(), foreground.clone())
 }

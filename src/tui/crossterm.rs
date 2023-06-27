@@ -77,16 +77,23 @@ impl<T: Write> Renderer for Crossterm<T> {
             .queue(cursor::SavePosition)
             .with_context(|| "queue save cursor position")?;
         for stack in c.get_changed() {
-            for command in stack.modifiers()?.iter() {
-                self.queue(command)
-                    .with_context(|| "queue tuxel modifier")?;
-            }
+            let (fgcolor, bgcolor) = stack.colors();
+            let output = match stack.content() {
+                Some(c) => c,
+                None => continue,
+            };
             let (x, y) = stack.coordinates();
             self.w
                 .queue(cursor::MoveTo(x as u16, y as u16))
                 .with_context(|| "queue moving cursor")?;
+            if let Some(bg) = bgcolor {
+                self.w.queue(style::SetBackgroundColor(bg.into()))?;
+            }
+            if let Some(fg) = fgcolor {
+                self.w.queue(style::SetForegroundColor(fg.into()))?;
+            }
             self.w
-                .queue(style::Print(format!("{}", &stack)))
+                .queue(style::Print(output))
                 .with_context(|| "queue printing cell text")?;
             self.w
                 .queue(style::ResetColor)
@@ -107,34 +114,6 @@ impl<T: Write> Renderer for Crossterm<T> {
 
     fn size_hint(&self) -> Result<(u16, u16)> {
         size()
-    }
-}
-
-impl<T: Write> Crossterm<T> {
-    fn queue(&mut self, m: &Modifier) -> Result<()> {
-        match m {
-            Modifier::BackgroundColor(r, g, b) => self
-                .w
-                .queue(style::SetBackgroundColor(Color::Rgb {
-                    r: *r,
-                    g: *g,
-                    b: *b,
-                }))
-                .with_context(|| "queue setting background color")?,
-            Modifier::ForegroundColor(r, g, b) => self
-                .w
-                .queue(style::SetForegroundColor(Color::Rgb {
-                    r: *r,
-                    g: *g,
-                    b: *b,
-                }))
-                .with_context(|| "queue setting foreground color")?,
-            Modifier::Bold => self
-                .w
-                .queue(style::SetAttribute(style::Attribute::Bold))
-                .with_context(|| "queue setting bold attribute")?,
-        };
-        Ok(())
     }
 }
 

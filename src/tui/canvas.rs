@@ -1,6 +1,7 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use super::colors::Rgb;
 use super::drawbuffer::{DBTuxel, DrawBuffer};
 use super::error::{Result, TuiError};
 use super::geometry::{Bounds2D, Idx, Rectangle};
@@ -20,8 +21,7 @@ struct CanvasInner {
 impl CanvasInner {
     fn get_draw_buffer(&mut self, c: Canvas, r: Rectangle) -> Result<DrawBuffer> {
         self.reclaim();
-        let modifiers = SharedModifiers::default();
-        let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), modifiers.clone(), c);
+        let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), c);
         for (y, row) in self
             .grid
             .iter_mut()
@@ -33,10 +33,7 @@ impl CanvasInner {
                 let canvas_idx = Idx(x, y, r.0 .2);
                 let cell = cellstack.acquire(canvas_idx.z());
                 let tuxel = match cell {
-                    Cell::Tuxel(mut t) => {
-                        t.shared_modifiers = Some(modifiers.clone());
-                        t
-                    }
+                    Cell::Tuxel(mut t) => t,
                     _ => return Err(TuiError::CellAlreadyOwned),
                 };
                 let db_tuxel = dbuf.push(tuxel);
@@ -93,7 +90,8 @@ impl CanvasInner {
     }
 
     fn acquire_cell(&mut self, idx: &Idx) -> Result<Cell> {
-        Ok(self.grid
+        Ok(self
+            .grid
             .get_mut(idx.y())
             .ok_or(TuiError::OutOfBoundsY(idx.y()))?
             .get_mut(idx.x())
@@ -102,7 +100,8 @@ impl CanvasInner {
     }
 
     fn replace_cell(&mut self, idx: &Idx, cell: Cell) -> Result<()> {
-        Ok(self.grid
+        Ok(self
+            .grid
             .get_mut(idx.y())
             .ok_or(TuiError::OutOfBoundsY(idx.y()))?
             .get_mut(idx.x())
@@ -118,7 +117,7 @@ impl CanvasInner {
             Err(e) => {
                 // if we fail to get c2 we need to return c1
                 self.replace_cell(&idx1, c1)?;
-                return Err(e)
+                return Err(e);
             }
             Ok(c) => c,
         };
@@ -127,19 +126,19 @@ impl CanvasInner {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
                 dbt.set_canvas_idx(&idx2);
-            },
+            }
             Cell::Tuxel(ref mut t) => {
                 t.set_idx(&idx2);
-            },
+            }
         }
         match &mut c2 {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
                 dbt.set_canvas_idx(&idx1);
-            },
+            }
             Cell::Tuxel(ref mut t) => {
                 t.set_idx(&idx1);
-            },
+            }
         }
 
         self.replace_cell(&idx1, c2)?;
@@ -251,11 +250,11 @@ impl Cell {
         }
     }
 
-    pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
+    pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
         match self {
-            Cell::Tuxel(t) => Ok(t.modifiers()),
-            Cell::DBTuxel(d) => d.modifiers(),
-            Cell::Empty => Ok(Vec::new()),
+            Cell::Tuxel(t) => t.colors(),
+            Cell::DBTuxel(d) => d.colors(),
+            Cell::Empty => (None, None),
         }
     }
 
@@ -340,14 +339,6 @@ impl Stack {
 }
 
 impl Stack {
-    pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
-        if let Some(idx) = self.top() {
-            self.lock().cells[idx].modifiers()
-        } else {
-            Ok(Vec::new())
-        }
-    }
-
     pub(crate) fn coordinates(&self) -> (usize, usize) {
         if let Some(idx) = self.top() {
             self.lock().cells[idx].coordinates()
@@ -355,53 +346,63 @@ impl Stack {
             (0, 0)
         }
     }
-}
 
-impl std::fmt::Display for Stack {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.top() {
-            Some(idx) => {
-                match self
-                    .lock()
-                    .cells
-                    .get(idx)
-                    .expect("if Stack.top() returns an index that element must exist")
-                    .get_content()
-                {
-                    Ok(c) => {
-                        write!(f, "{}", c)
-                    }
-                    // show radioactive symbol if we can't find a character to show
-                    Err(_) => write!(f, "\u{2622}"),
-                }
-            }
-            // show radioactive symbol if we can't find a character to show
-            None => return Ok(()),
+    pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
+        let fg = Rgb::default();
+        let bg = Rgb::default();
+        if let Some(idx) = self.top() {
+            self.lock()
+                .cells
+                .get(idx)
+                .expect("if Stack.top() returns an index that element must exist")
+                .colors()
+        } else {
+            (None, None)
+        }
+    }
+
+    pub(crate) fn content(&self) -> Option<char> {
+        if let Some(idx) = self.top() {
+            self.lock()
+                .cells
+                .get(idx)
+                .expect("if Stack.top() returns an index that element must exist")
+                .get_content()
+                .ok()
+        } else {
+            None
         }
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq)]
 pub(crate) enum Modifier {
-    ForegroundColor(u8, u8, u8),
-    BackgroundColor(u8, u8, u8),
-    Bold,
+    SetForegroundColor(u8, u8, u8),
+    SetBackgroundColor(u8, u8, u8),
+    SetBGLightness(f32),
+    SetFGLightness(f32),
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct SharedModifiers {
-    inner: Arc<Mutex<Vec<Modifier>>>,
-}
-
-impl SharedModifiers {
-    pub(crate) fn lock(&self) -> MutexGuard<Vec<Modifier>> {
-        self.inner
-            .lock()
-            .expect("TODO: handle thread panicking better than this")
-    }
-
-    pub fn push(&self, m: Modifier) {
-        self.lock().push(m)
+impl Modifier {
+    pub(crate) fn apply(
+        &self,
+        (fgcolor, bgcolor): (Option<Rgb>, Option<Rgb>),
+    ) -> (Option<Rgb>, Option<Rgb>) {
+        match (fgcolor.clone(), bgcolor.clone(), self) {
+            (_, bgcolor, Modifier::SetForegroundColor(r, g, b)) => {
+                (Some(Rgb::new(*r, *g, *b)), bgcolor)
+            }
+            (fgcolor, _, Modifier::SetBackgroundColor(r, g, b)) => {
+                (fgcolor, Some(Rgb::new(*r, *g, *b)))
+            }
+            (Some(fgcolor), bgcolor, Modifier::SetFGLightness(l)) => {
+                (Some(fgcolor.set_lightness(*l)), bgcolor)
+            }
+            (fgcolor, Some(bgcolor), Modifier::SetBGLightness(l)) => {
+                (fgcolor, Some(bgcolor.set_lightness(*l)))
+            }
+            _ => (fgcolor, bgcolor),
+        }
     }
 }
 

@@ -1,7 +1,8 @@
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::canvas::{Canvas, Modifier, SharedModifiers};
+use super::canvas::{Canvas, Modifier};
+use super::colors::Rgb;
 use super::error::{Result, TuiError};
 use super::geometry::{Direction, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
@@ -10,7 +11,7 @@ pub(crate) struct DrawBufferInner {
     pub(crate) rectangle: Rectangle,
     pub(crate) border: bool,
     pub(crate) buf: Vec<Vec<Tuxel>>,
-    pub(crate) modifiers: SharedModifiers,
+    pub(crate) modifiers: Vec<Modifier>,
     pub(crate) canvas: Canvas,
 }
 
@@ -222,8 +223,8 @@ impl DrawBufferInner {
         Ok(self.buf[y][x].active())
     }
 
-    fn tuxel_modifiers(&self, x: usize, y: usize) -> Result<Vec<Modifier>> {
-        Ok(self.buf[y][x].modifiers())
+    fn tuxel_colors(&self, x: usize, y: usize) -> (Option<Rgb>, Option<Rgb>) {
+        self.buf[y][x].colors()
     }
 
     fn tuxel_content(&self, x: usize, y: usize) -> Result<char> {
@@ -237,12 +238,7 @@ pub(crate) struct DrawBuffer {
 }
 
 impl DrawBuffer {
-    pub(crate) fn new(
-        sender: Sender<Tuxel>,
-        rectangle: Rectangle,
-        modifiers: SharedModifiers,
-        canvas: Canvas,
-    ) -> Self {
+    pub(crate) fn new(sender: Sender<Tuxel>, rectangle: Rectangle, canvas: Canvas) -> Self {
         let mut buf: Vec<_> = Vec::with_capacity(rectangle.height());
         for _ in 0..rectangle.height() {
             let row: Vec<Tuxel> = Vec::with_capacity(rectangle.width());
@@ -253,7 +249,7 @@ impl DrawBuffer {
                 rectangle,
                 border: false,
                 buf,
-                modifiers,
+                modifiers: Vec::new(),
                 canvas,
             })),
             sender,
@@ -348,12 +344,17 @@ impl DBTuxel {
         (self.idx.0, self.idx.1)
     }
 
-    pub(crate) fn modifiers(&self) -> Result<Vec<Modifier>> {
-        self.lock().tuxel_modifiers(self.buf_idx.0, self.buf_idx.1)
-    }
-
     pub(crate) fn set_canvas_idx(&mut self, idx: &Idx) {
         self.idx = idx.clone()
+    }
+
+    pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
+        let inner = self.lock();
+        let colors = inner.tuxel_colors(self.buf_idx.x(), self.buf_idx.y());
+        inner
+            .modifiers
+            .iter()
+            .fold(colors, |cs, modifier| modifier.apply(cs))
     }
 }
 
@@ -387,7 +388,7 @@ mod test {
     fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
         let tuxels = tuxel_buf_from_rectangle(&rect);
         let (sender, receiver) = channel();
-        let mut dbuf = DrawBuffer::new(sender.clone(), rect.clone(), SharedModifiers::default());
+        let mut dbuf = DrawBuffer::new(sender.clone(), rect.clone(), Vec::new());
         dbuf.set_buf(tuxels)?;
         {
             let inner = dbuf.lock();

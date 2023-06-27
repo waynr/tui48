@@ -32,6 +32,9 @@ pub(crate) enum TuiError {
     #[error("invalid translation")]
     InvalidTranslation,
 
+    #[error("top tuxel in stack not found")]
+    TopTuxelNotFound,
+
     #[error("io error")]
     StdIOError(#[from] std::io::Error),
 

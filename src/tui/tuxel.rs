@@ -1,13 +1,13 @@
-use super::canvas::{Modifier, SharedModifiers};
 use super::geometry::Idx;
+use super::colors::Rgb;
 
 #[derive(Default)]
 pub(crate) struct Tuxel {
     active: bool,
     content: char,
     idx: Idx,
-    modifiers: Vec<Modifier>,
-    pub(crate) shared_modifiers: Option<SharedModifiers>,
+    fgcolor: Option<Rgb>,
+    bgcolor: Option<Rgb>,
 }
 
 impl Tuxel {
@@ -18,9 +18,9 @@ impl Tuxel {
             //content: '\u{2566}',
             active: false,
             content: '-',
+            fgcolor: None,
+            bgcolor: None,
             idx,
-            modifiers: Vec::new(),
-            shared_modifiers: None,
         }
     }
 
@@ -33,19 +33,9 @@ impl Tuxel {
         (self.idx.0, self.idx.1)
     }
 
-    pub(crate) fn modifiers(&self) -> Vec<Modifier> {
-        let mut modifiers = match &self.shared_modifiers {
-            Some(ms) => ms.lock().clone(),
-            None => Vec::new(),
-        };
-        modifiers.append(&mut self.modifiers.clone());
-        modifiers.to_vec()
-    }
-
     pub(crate) fn clear(&mut self) {
+        self.active = false;
         self.content = ' ';
-        self.modifiers.clear();
-        self.shared_modifiers = None;
     }
 
     pub(crate) fn active(&self) -> bool {
@@ -62,6 +52,10 @@ impl Tuxel {
 
     pub(crate) fn set_idx(&mut self, idx: &Idx) {
         self.idx = idx.clone()
+    }
+
+    pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
+        (self.fgcolor.clone(), self.bgcolor.clone())
     }
 }
 
