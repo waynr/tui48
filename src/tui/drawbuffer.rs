@@ -360,8 +360,13 @@ impl DBTuxel {
 
 #[cfg(test)]
 mod test {
+    use std::sync::mpsc::channel;
+    use std::sync::mpsc::Receiver;
+
     use super::*;
     use rstest::*;
+
+    use super::super::geometry::Bounds2D;
 
     fn rectangle(x: usize, y: usize, z: usize, width: usize, height: usize) -> Rectangle {
         Rectangle(Idx(x, y, z), Bounds2D(width, height))
@@ -381,23 +386,7 @@ mod test {
         tuxels
     }
 
-    #[rstest]
-    #[case::base(rectangle(0, 0, 0, 5, 5))]
-    #[case::asymmetric(rectangle(0, 0, 0, 274, 75))]
-    #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
-    fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
-        let tuxels = tuxel_buf_from_rectangle(&rect);
-        let (sender, receiver) = channel();
-        let mut dbuf = DrawBuffer::new(sender.clone(), rect.clone(), Vec::new());
-        dbuf.set_buf(tuxels)?;
-        {
-            let inner = dbuf.lock();
-            assert_eq!(inner.buf.len(), rect.height());
-            for row in &inner.buf {
-                assert_eq!(row.len(), rect.width());
-            }
-        }
-        drop(dbuf);
+    fn verify_messages_sent(receiver: &Receiver<Tuxel>, expected: usize) {
         let mut count = 0;
         loop {
             match receiver.try_recv() {
@@ -408,7 +397,31 @@ mod test {
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
             }
         }
-        assert_eq!(count, rect.width() * rect.height());
+        assert_eq!(count, expected);
+    }
+
+
+    #[rstest]
+    #[case::base(rectangle(0, 0, 0, 5, 5))]
+    #[case::asymmetric(rectangle(0, 0, 0, 274, 75))]
+    #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
+    fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
+        let canvas = Canvas::new(rect.width() * 2, rect.height() * 2);
+        let (sender, receiver) = channel();
+        let mut dbuf = canvas.get_draw_buffer(rect.clone())?;
+        dbuf.sender = sender.clone();
+        {
+            let inner = dbuf.lock();
+            assert_eq!(inner.buf.len(), rect.height());
+            for row in &inner.buf {
+                assert_eq!(row.len(), rect.width());
+            }
+        }
+
+        verify_messages_sent(&receiver, 0);
+        drop(dbuf);
+        verify_messages_sent(&receiver, rect.width() * rect.height());
+
         Ok(())
     }
 }

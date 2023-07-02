@@ -60,6 +60,10 @@ impl CanvasInner {
         (self.rectangle.1 .0, self.rectangle.1 .1)
     }
 
+    fn bounds(&self) -> Bounds2D {
+        self.rectangle.1.clone()
+    }
+
     fn get_changed(&self) -> Vec<Stack> {
         let mut stacks = Vec::new();
         loop {
@@ -202,6 +206,10 @@ impl Canvas {
 
     pub(crate) fn draw_all(&mut self) -> Result<()> {
         self.lock().draw_all()
+    }
+
+    pub(crate) fn bounds(&self) -> Bounds2D {
+        self.lock().bounds()
     }
 
     pub(crate) fn dimensions(&self) -> (usize, usize) {
@@ -417,8 +425,8 @@ mod test {
     //#[case::toobig((1000, 1000))]
     fn canvas_size(#[case] dims: (usize, usize)) {
         let canvas = Canvas::new(dims.0, dims.1);
-        assert_eq!(canvas.grid.len(), dims.1);
-        for row in &canvas.grid {
+        assert_eq!(canvas.lock().grid.len(), dims.1);
+        for row in &canvas.lock().grid {
             assert_eq!(row.len(), dims.0);
         }
     }
@@ -496,7 +504,8 @@ mod test {
             for row in &inner.buf {
                 for tuxel in row {
                     let idx = tuxel.idx();
-                    let cell = &canvas.grid[idx.1][idx.0].lock().cells[idx.2];
+                    let inner = canvas.lock();
+                    let cell = &inner.grid[idx.1][idx.0].lock().cells[idx.2];
                     assert!(is_dbtuxel(cell));
                     idxs.push(idx);
                 }
@@ -506,14 +515,16 @@ mod test {
         drop(dbuf);
 
         for idx in idxs.iter() {
-            let cell = &canvas.grid[idx.1][idx.0].lock().cells[idx.2];
+            let inner = canvas.lock();
+            let cell = &inner.grid[idx.1][idx.0].lock().cells[idx.2];
             assert!(is_dbtuxel(cell));
         }
 
-        canvas.reclaim();
+        canvas.lock().reclaim();
 
         for idx in idxs.iter() {
-            let cell = &canvas.grid[idx.1][idx.0].lock().cells[idx.2];
+            let inner = canvas.lock();
+            let cell = &inner.grid[idx.1][idx.0].lock().cells[idx.2];
             assert!(is_tuxel(cell));
         }
 
