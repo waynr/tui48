@@ -29,8 +29,12 @@ pub(crate) enum TuiError {
     #[error("tuxel channel send failed")]
     TuxelSendError(#[from] std::sync::mpsc::SendError<crate::tui::tuxel::Tuxel>),
 
-    #[error("invalid translation")]
-    InvalidTranslation,
+    #[error("invalid translation \n\tmagnitude: {mag:?} \n\tdirection: {dir:?} \n\trectangle: {rect:?}")]
+    InvalidVectorTranslation {
+        mag: usize,
+        dir: super::geometry::Direction,
+        rect: super::geometry::Rectangle,
+    },
 
     #[error("top tuxel in stack not found")]
     TopTuxelNotFound,

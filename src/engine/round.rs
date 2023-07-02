@@ -18,12 +18,11 @@ impl Idx {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) enum Hint {
-    #[default]
-    None,
     ToIdx(Idx),
-    NewFrom(Direction),
+    NewValueToIdx(u16, Idx),
+    NewFrom(u16, Direction),
 }
 
 #[derive(Default)]
@@ -33,6 +32,12 @@ pub(crate) struct AnimationHint {
 }
 
 impl AnimationHint {
+    fn new() -> Self {
+        Self {
+            hint: Vec::new(),
+            changed: false,
+        }
+    }
     fn set(&mut self, idx: &Idx, value: Hint) {
         self.changed = true;
         self.hint.push((idx.clone(), value));
@@ -100,7 +105,7 @@ impl Round {
     }
 
     pub fn shift<T: Rng>(&mut self, mut rng: T, direction: &Direction) -> Option<AnimationHint> {
-        let mut hint = AnimationHint::default();
+        let mut hint = AnimationHint::new();
         let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
         for row in rows {
@@ -125,10 +130,11 @@ impl Round {
                 // if the pivot element and the cmp element are equal then they must be combined;
                 // do so and increment the score by the value of the eliminated element
                 if pivot == cmp {
+                    let new_value = pivot + cmp;
                     self.score += cmp;
                     self.set(pivot_idx, pivot + cmp);
                     self.set(cmp_idx, 0);
-                    hint.set(cmp_idx, Hint::ToIdx(pivot_idx.clone()));
+                    hint.set(cmp_idx, Hint::NewValueToIdx(new_value, pivot_idx.clone()));
                 }
                 if let Some(idx) = pivot_iter.next() {
                     pivot_idx = idx;
@@ -147,7 +153,7 @@ impl Round {
                 .expect("all rows are populated and at least one row has changed");
             let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(&mut rng)];
             self.set(idx, new_value);
-            hint.set(idx, Hint::NewFrom(direction.clone()));
+            hint.set(idx, Hint::NewFrom(new_value, direction.clone()));
             Some(hint)
         } else {
             None

@@ -26,6 +26,6 @@ pub(crate) enum Error {
     #[error("default colors already set")]
     DefaultColorsAlreadySet,
 
-    #[error("unable to retrieve drawbuffer")]
-    UnableToRetrieveDrawBuffer,
+    #[error("unable to retrieve drawbuffer: {reason:?}")]
+    UnableToRetrieveDrawBuffer { reason: String },
 }

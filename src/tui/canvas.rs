@@ -33,7 +33,7 @@ impl CanvasInner {
                 let canvas_idx = Idx(x, y, r.0 .2);
                 let cell = cellstack.acquire(canvas_idx.z());
                 let tuxel = match cell {
-                    Cell::Tuxel(mut t) => t,
+                    Cell::Tuxel(t) => t,
                     _ => return Err(TuiError::CellAlreadyOwned),
                 };
                 let db_tuxel = dbuf.push(tuxel);
@@ -389,6 +389,8 @@ pub(crate) enum Modifier {
     SetBackgroundColor(u8, u8, u8),
     SetBGLightness(f32),
     SetFGLightness(f32),
+    AdjustLightnessBG(f32),
+    AdjustLightnessFG(f32),
 }
 
 impl Modifier {
@@ -408,6 +410,12 @@ impl Modifier {
             }
             (fgcolor, Some(bgcolor), Modifier::SetBGLightness(l)) => {
                 (fgcolor, Some(bgcolor.set_lightness(*l)))
+            }
+            (Some(fgcolor), bgcolor, Modifier::AdjustLightnessFG(l)) => {
+                (Some(fgcolor.adjust_lightness(*l)), bgcolor)
+            }
+            (fgcolor, Some(bgcolor), Modifier::AdjustLightnessBG(l)) => {
+                (fgcolor, Some(bgcolor.adjust_lightness(*l)))
             }
             _ => (fgcolor, bgcolor),
         }

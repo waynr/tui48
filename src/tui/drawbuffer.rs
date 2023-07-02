@@ -174,12 +174,18 @@ impl DrawBufferInner {
     }
 
     fn translate(&mut self, magnitude: usize, dir: Direction) -> Result<()> {
+        self.rectangle.translate(magnitude, dir.clone())?;
+        let canvas_bounds = self.canvas.bounds();
         match dir {
             Direction::Left => {
                 for t in self.buf.iter_mut().flatten() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    new_idx.0 = new_idx.0 - magnitude;
+                    new_idx.0 = if new_idx.0 >= magnitude {
+                        new_idx.0 - magnitude
+                    } else {
+                        0
+                    };
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
@@ -188,7 +194,11 @@ impl DrawBufferInner {
                 for t in self.buf.iter_mut().flatten().rev() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    new_idx.0 = new_idx.0 + magnitude;
+                    if new_idx.1 + magnitude <= canvas_bounds.width() {
+                        new_idx.0 += magnitude
+                    } else {
+                        new_idx.0 = canvas_bounds.width() - self.rectangle.width()
+                    };
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
@@ -197,7 +207,12 @@ impl DrawBufferInner {
                 for t in self.buf.iter_mut().flatten() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    new_idx.1 = new_idx.1 - magnitude;
+                    new_idx.1 = if new_idx.1 >= magnitude {
+                        new_idx.1 - magnitude
+                    } else {
+                        0
+                    };
+
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
@@ -206,7 +221,11 @@ impl DrawBufferInner {
                 for t in self.buf.iter_mut().flatten().rev() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    new_idx.1 = new_idx.1 + magnitude;
+                    if new_idx.1 + magnitude <= canvas_bounds.height() {
+                        new_idx.1 += magnitude;
+                    } else {
+                        new_idx.1 = canvas_bounds.height() - self.rectangle.height();
+                    }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
@@ -292,8 +311,21 @@ impl DrawBuffer {
         self.lock().write_center(s)
     }
 
+    pub(crate) fn translate(&self, magnitude: usize, dir: Direction) -> Result<()> {
+        self.lock().translate(magnitude, dir)
+    }
+
     pub(crate) fn rectangle(&self) -> Rectangle {
         self.lock().rectangle()
+    }
+
+    pub(crate) fn clone_to(&self, layer: usize) -> Result<Self> {
+        let inner = self.lock();
+        let mut rectangle = inner.rectangle.clone();
+        rectangle.0 .2 = layer;
+        let new_dbuf = inner.canvas.get_draw_buffer(rectangle)?;
+        drop(inner);
+        Ok(new_dbuf)
     }
 }
 
@@ -308,7 +340,8 @@ impl<'a> DrawBuffer {
 
 impl Drop for DrawBuffer {
     fn drop(&mut self) {
-        for row in self.lock().buf.iter_mut() {
+        let mut inner = self.lock();
+        for row in inner.buf.iter_mut() {
             while let Some(mut tuxel) = row.pop() {
                 tuxel.clear();
                 // can't do anything about send errors here -- we rely on the channel having the

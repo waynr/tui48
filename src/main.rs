@@ -1,6 +1,8 @@
 use std::io::stdout;
+use std::error::Error;
 
 use rand::thread_rng;
+use anyhow::Result;
 
 mod error;
 mod engine;
@@ -8,7 +10,6 @@ mod tui;
 mod tui48;
 
 use engine::board::Board;
-use error::Result;
 use tui48::{init, Tui48};
 use tui::crossterm::{Crossterm, CrosstermEvents};
 
@@ -22,5 +23,13 @@ fn main() -> Result<()> {
 
     init()?;
 
-    Ok(tui48.run()?)
+    tui48.run()?;
+    // match tui48.run() {
+    //     Err(e) => {
+    //         eprintln!("{}", e);
+    //     },
+    //     Ok(_) => eprintln!("everything okay!"),
+    // }
+
+    Ok(())
 }

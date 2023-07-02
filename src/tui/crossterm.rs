@@ -32,11 +32,7 @@ impl<T: Write> Crossterm<T> {
 
 impl<T: Write> Drop for Crossterm<T> {
     fn drop(&mut self) {
-        self.w.execute(cursor::Show).expect("showing cursor again");
-        self.w
-            .execute(terminal::LeaveAlternateScreen)
-            .expect("leaving alternate screen");
-        terminal::disable_raw_mode().expect("disabling raw mode");
+        self.recover();
     }
 }
 
@@ -114,6 +110,14 @@ impl<T: Write> Renderer for Crossterm<T> {
 
     fn size_hint(&self) -> Result<(u16, u16)> {
         size()
+    }
+
+    fn recover(&mut self) {
+        self.w.execute(cursor::Show).expect("showing cursor again");
+        self.w
+            .execute(terminal::LeaveAlternateScreen)
+            .expect("leaving alternate screen");
+        terminal::disable_raw_mode().expect("disabling raw mode");
     }
 }
 

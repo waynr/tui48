@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::OnceLock;
 
 use palette::{FromColor, Lch, Srgb};
@@ -55,10 +57,25 @@ struct Tui48Board {
 ///  6                                 42
 ///
 ///
-///
+const BOARD_FIXED_Y_OFFSET: usize = 5;
+const BOARD_FIXED_X_OFFSET: usize = 5;
+const BOARD_BORDER_WIDTH: usize = 1;
+const BOARD_X_PADDING: usize = 2;
+const BOARD_Y_PADDING: usize = 1;
+const TILE_HEIGHT: usize = 5;
+const TILE_WIDTH: usize = 6;
+
+const BOARD_LAYER_IDX: usize = 2;
+const LOWER_ANIMATION_LAYER_IDX: usize = 3;
+const TILE_LAYER_IDX: usize = 4;
+const UPPER_ANIMATION_LAYER_IDX: usize = 5;
+
 impl Tui48Board {
     fn new(game: &Board, canvas: &mut Canvas) -> Result<Self> {
-        let board_rectangle = Rectangle(Idx(5, 5, 0), Bounds2D(36, 25));
+        let board_rectangle = Rectangle(
+            Idx(BOARD_FIXED_X_OFFSET, BOARD_FIXED_Y_OFFSET, 0),
+            Bounds2D(36, 25),
+        );
         let (cwidth, cheight) = canvas.dimensions();
         let (x_extent, y_extent) = board_rectangle.extents();
         if cwidth < x_extent || cheight < y_extent {
@@ -80,17 +97,16 @@ impl Tui48Board {
         let (width, height) = game.dimensions();
         let round = game.current();
         let mut slots = Vec::with_capacity(height);
-        let x_offset = 5 + 1 + 2;
-        let y_offset = 5 + 1;
+        let x_offset = BOARD_FIXED_X_OFFSET + BOARD_BORDER_WIDTH + BOARD_X_PADDING;
+        let y_offset = BOARD_FIXED_Y_OFFSET + BOARD_BORDER_WIDTH;
         for y in 0..height {
             let mut row = Vec::with_capacity(width);
             for x in 0..width {
                 let mut opt = None;
                 let value = round.get(&BoardIdx(x, y));
                 if value > 0 {
-                    let idx = Idx(x_offset + (2 + 6) * x, y_offset + (1 + 5) * y, 5);
-                    let bounds = Bounds2D(6, 5);
-                    let mut card_buffer = canvas.get_draw_buffer(Rectangle(idx, bounds))?;
+                    let r = Self::tile_rectangle(x, y, 5);
+                    let mut card_buffer = canvas.get_draw_buffer(r)?;
                     let colors = colors_from_value(value);
                     card_buffer.modify(colors.0);
                     card_buffer.modify(colors.1);
@@ -115,66 +131,255 @@ impl Tui48Board {
             slots,
         })
     }
+
+    fn tile_rectangle(x: usize, y: usize, z: usize) -> Rectangle {
+        let x_offset = BOARD_FIXED_X_OFFSET + BOARD_BORDER_WIDTH + BOARD_X_PADDING;
+        let y_offset = BOARD_FIXED_Y_OFFSET + BOARD_BORDER_WIDTH;
+        let idx = Idx(
+            x_offset + (BOARD_X_PADDING + TILE_WIDTH) * x,
+            y_offset + (BOARD_Y_PADDING + TILE_HEIGHT) * y,
+            z,
+        );
+        let bounds = Bounds2D(TILE_WIDTH, TILE_HEIGHT);
+        Rectangle(idx, bounds)
+    }
+}
+
+impl From<&BoardIdx> for Idx {
+    fn from(board_idx: &BoardIdx) -> Idx {
+        Idx(board_idx.0, board_idx.1, 0)
+    }
 }
 
 struct AnimatedTui48Board {
     canvas: Canvas,
-    new_tile: Option<DrawBuffer>,
+    new_tile: Option<Rc<RefCell<DrawBuffer>>>,
+    displace_tile: Option<Rc<RefCell<DrawBuffer>>>,
     tui_board: Tui48Board,
     animation_hint: AnimationHint,
-    round: Round,
 }
 
 impl AnimatedTui48Board {
-    fn new(
-        canvas: Canvas,
-        tui_board: Tui48Board,
-        animation_hint: AnimationHint,
-        round: Round,
-    ) -> Self {
+    fn new(canvas: Canvas, tui_board: Tui48Board, animation_hint: AnimationHint) -> Self {
         Self {
             canvas,
             new_tile: None,
+            displace_tile: None,
             tui_board,
             animation_hint,
-            round,
         }
     }
 
     fn animate(&mut self) -> Result<bool> {
         let hints = self.animation_hint.hints();
-        for (idx, hint) in hints.iter().into_iter() {
-            let moving_db = &self.tui_board.slots[idx.y()][idx.x()]
-                .as_mut()
-                .ok_or(Error::UnableToRetrieveDrawBuffer);
-            let target_rectangle = match hint {
-                Hint::None => continue,
-                Hint::ToIdx(to_idx) => self.tui_board.slots[to_idx.y()][to_idx.x()]
-                    .as_mut()
-                    .ok_or(Error::UnableToRetrieveDrawBuffer)?
-                    .rectangle(),
-                Hint::NewFrom(from_dir) => {
-                    self.new_tile = Some(
-                        self.canvas
-                            .get_draw_buffer(Rectangle(Idx(0, 0, 0), Bounds2D(10, 10)))?,
-                    );
-                    let to_idx = idx;
-                    self.tui_board.slots[to_idx.y()][to_idx.x()]
-                        .as_mut()
-                        .ok_or(Error::UnableToRetrieveDrawBuffer)?
-                        .rectangle()
+        Ok(hints
+            .iter()
+            .into_iter()
+            .map(|(idx, hint)| {
+                let idx: Idx = idx.into();
+                match hint {
+                    Hint::NewValueToIdx(new_value, to_idx) => {
+                        let to_idx: Idx = to_idx.into();
+                        let shifting_continue = self.animate_shifting_tile(
+                            Some(*new_value),
+                            idx.clone(),
+                            to_idx.clone(),
+                        )?;
+                        self.animate_displaced_tile(to_idx.clone(), shifting_continue)?;
+                        Ok(shifting_continue)
+                    }
+                    Hint::ToIdx(to_idx) => {
+                        let to_idx: Idx = to_idx.into();
+                        let shifting_continue =
+                            self.animate_shifting_tile(None, idx.clone(), to_idx.clone())?;
+                        self.animate_displaced_tile(to_idx.clone(), shifting_continue)?;
+                        Ok(shifting_continue)
+                    }
+                    Hint::NewFrom(new_value, from_dir) => {
+                        self.animate_new_tile(*new_value, idx.clone(), from_dir.clone())
+                    }
                 }
-            };
+            })
+            .collect::<Result<Vec<_>>>()?
+            .iter()
+            .all(|v| *v))
+    }
+
+    fn animate_displaced_tile(&mut self, displace_idx: Idx, last_frame: bool) -> Result<bool> {
+        let displace_buf = match self.tui_board.slots[displace_idx.y()][displace_idx.x()].take() {
+            Some(db) => db,
+            None => return Ok(false),
+        };
+        let displace_tile = match &self.displace_tile {
+            None => {
+                // copy buffer to bottom layer as self.displace_tile
+                let dbuf = Rc::new(RefCell::new(
+                    displace_buf.clone_to(LOWER_ANIMATION_LAYER_IDX)?,
+                ));
+                // drop old buffer, should trigger clear of buffer and return of tuxels to the
+                // canvas
+                drop(displace_buf);
+                self.displace_tile = Some(dbuf.clone());
+                dbuf
+            }
+            Some(dbuf) => dbuf.clone(),
+        };
+
+        if last_frame {
+            // on the last frame, drop the buffer
+            self.displace_tile = None;
+            return Ok(false);
         }
-        Ok(false)
+
+        let mut displace_tile = displace_tile.borrow_mut();
+        displace_tile.modify(Modifier::AdjustLightnessBG(-0.1));
+        displace_tile.modify(Modifier::AdjustLightnessFG(-0.1));
+
+        Ok(true)
     }
 
-    fn animate_existing_tile(&mut self, from_dir: Direction) -> Result<bool> {
-        Ok(false)
+    fn animate_shifting_tile(
+        &mut self,
+        new_value: Option<u16>,
+        moving_idx: Idx,
+        to_idx: Idx,
+    ) -> Result<bool> {
+        let target_rectangle = Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), TILE_LAYER_IDX);
+
+        let moving_rectangle = self.tui_board.slots[moving_idx.y()][moving_idx.x()]
+            .as_ref()
+            .ok_or(Error::UnableToRetrieveDrawBuffer {
+                reason: String::from("meow3"),
+            })?
+            .rectangle();
+
+        // we check for animation termination before doing translation to ensure at least one frame
+        // with no translation is available
+        if moving_rectangle.x() == target_rectangle.x()
+            && moving_rectangle.y() == target_rectangle.y()
+        {
+            // take ownership of card from its previous slot
+            let mut moving_buf = self.tui_board.slots[moving_idx.y()][moving_idx.x()]
+                .take()
+                .expect("expect the buffer we've been working with not to be empty");
+
+            // on last frame: update content if there is a new value
+            if let Some(new_value) = new_value {
+                let colors = colors_from_value(new_value);
+                moving_buf.modify(colors.0);
+                moving_buf.modify(colors.1);
+                moving_buf.draw_border()?;
+                moving_buf.fill(' ')?;
+                moving_buf.write_center(&format!("{}", new_value))?;
+            }
+
+            // move buffer into destination slot on the tui_board
+            let _ = self.tui_board.slots[to_idx.y()][to_idx.x()].replace(moving_buf);
+
+            return Ok(false);
+        }
+
+        let moving_buf = self.tui_board.slots[moving_idx.y()][moving_idx.x()]
+            .as_mut()
+            .ok_or(Error::UnableToRetrieveDrawBuffer {
+                reason: String::from("meow4"),
+            })?;
+
+        // 1 frame of buffer translation
+        match (
+            moving_idx.x() as i16 - to_idx.x() as i16,
+            moving_idx.y() as i16 - to_idx.y() as i16,
+        ) {
+            (0, 0) => Ok(true), //no translation necessary
+            (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x > 0 => {
+                moving_buf.translate(1, Direction::Left)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x < 0 => {
+                moving_buf.translate(1, Direction::Right)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y > 0 => {
+                moving_buf.translate(1, Direction::Up)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y < 0 => {
+                moving_buf.translate(1, Direction::Down)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y > 0 => {
+                moving_buf.translate(1, Direction::Up)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y < 0 => {
+                moving_buf.translate(1, Direction::Down)?;
+                Ok(true)
+            }
+            (x, 0) if x > 0 => {
+                moving_buf.translate(1, Direction::Left)?;
+                Ok(true)
+            }
+            (x, 0) if x < 0 => {
+                moving_buf.translate(1, Direction::Right)?;
+                Ok(true)
+            }
+            (0, y) if y > 0 => {
+                moving_buf.translate(1, Direction::Up)?;
+                Ok(true)
+            }
+            (0, y) if y < 0 => {
+                moving_buf.translate(1, Direction::Down)?;
+                Ok(true)
+            }
+            _ => Ok(true),
+        }
     }
 
-    fn animate_new_tile(&mut self, from_dir: Direction) -> Result<bool> {
-        Ok(false)
+    fn animate_new_tile(
+        &mut self,
+        new_value: u16,
+        to_idx: Idx,
+        from_dir: Direction,
+    ) -> Result<bool> {
+        let new_tile = match &self.new_tile {
+            None => {
+                // generate new tile
+                let from_idx = match from_dir {
+                    Direction::Left => Idx(0, to_idx.y(), 0),
+                    Direction::Right => Idx(3, to_idx.y(), 0),
+                    Direction::Up => Idx(to_idx.x(), 3, 0),
+                    Direction::Down => Idx(to_idx.x(), 0, 0),
+                };
+                let origin_rectangle =
+                    Tui48Board::tile_rectangle(from_idx.x(), from_idx.y(), TILE_LAYER_IDX);
+
+                let dbuf = Rc::new(RefCell::new(self.canvas.get_draw_buffer(origin_rectangle)?));
+                self.new_tile = Some(dbuf.clone());
+                dbuf.borrow_mut().write_center(&format!("{}", new_value))?;
+                dbuf
+            }
+            Some(dbuf) => dbuf.clone(),
+        };
+
+        // compare new tile rectangle with target to determine if it's time to terminate. on
+        // termination, assign new tile to the Tui48Board slot where it belongs
+        {
+            if new_tile.borrow().rectangle().0 == to_idx {
+                self.new_tile = None;
+                let t = Rc::into_inner(new_tile)
+                    .expect("there should only be one strong reference to new_tile at this point")
+                    .into_inner();
+                self.tui_board.slots[to_idx.x()][to_idx.y()] = Some(t);
+                return Ok(false);
+            }
+        }
+
+        // 1 frame of buffer translation
+        {
+            new_tile.borrow_mut().translate(1, from_dir.opposite())?;
+        }
+
+        Ok(true)
     }
 
     fn extract_board(self) -> Tui48Board {
@@ -255,7 +460,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         let (width, height) = renderer.size_hint()?;
         Ok(Self {
             board,
-            redraw_entire: true,
+            redraw_entire: false,
             renderer,
             event_source,
             canvas: Canvas::new(width as usize, height as usize),
@@ -263,8 +468,18 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         })
     }
 
-    /// Run consumes the Tui48 instance and takes control of the terminal to begin gameplay.
     pub(crate) fn run(mut self) -> Result<()> {
+        match self.inner_run() {
+            Err(e) => {
+                self.renderer.recover();
+                Err(e)
+            }
+            Ok(_) => Ok(()),
+        }
+    }
+
+    /// Run consumes the Tui48 instance and takes control of the terminal to begin gameplay.
+    pub(crate) fn inner_run(&mut self) -> Result<()> {
         self.resize()?;
 
         loop {
@@ -326,10 +541,10 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                         .take()
                         .expect("tui_board should always be Some at this point"),
                     hint,
-                    self.board.current(),
                 );
                 while animation.animate()? {
                     std::thread::sleep(std::time::Duration::from_millis(50));
+                    self.renderer.render(&self.canvas)?;
                 }
                 self.tui_board = Some(animation.extract_board());
             }

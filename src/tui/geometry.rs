@@ -1,7 +1,7 @@
 use super::error::{Result, TuiError};
 
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Idx(pub usize, pub usize, pub usize);
 
 impl Idx {
@@ -21,10 +21,22 @@ impl Idx {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Bounds2D(pub usize, pub usize);
 
-#[derive(Clone, Default)]
+impl Bounds2D {
+    #[inline(always)]
+    pub(crate) fn width(&self) -> usize {
+        self.0
+    }
+
+    #[inline(always)]
+    pub(crate) fn height(&self) -> usize {
+        self.1
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Rectangle(pub Idx, pub Bounds2D);
 
 impl Rectangle {
@@ -48,6 +60,7 @@ impl Rectangle {
         self.0 .1
     }
 
+    #[inline(always)]
     pub(crate) fn relative_idx(&self, pos: &Position) -> (usize, usize) {
         match pos {
             Position::TopLeft => (0, 0),
@@ -61,11 +74,19 @@ impl Rectangle {
     #[inline(always)]
     pub(crate) fn translate(&mut self, mag: usize, dir: Direction) -> Result<()> {
         match dir {
-            Direction::Left if self.0 .0 != 0 => self.0 .0 = self.0 .0 - 1,
-            Direction::Right => self.0 .0 = self.0 .0 + 1,
-            Direction::Up if self.0 .1 != 0 => self.0 .1 = self.0 .1 - 1,
-            Direction::Down => self.0 .1 = self.0 .1 + 1,
-            _ => return Err(TuiError::InvalidTranslation),
+            Direction::Left if self.x() > mag => self.0 .0 -= mag,
+            Direction::Left if self.x() <= mag => self.0 .0 = 0,
+            Direction::Right => self.0 .0 += mag,
+            Direction::Up if self.y() > mag => self.0 .1 -= mag,
+            Direction::Up if self.y() <= mag => self.0 .1 = 0,
+            Direction::Down => self.0 .1 += mag,
+            _ => {
+                return Err(TuiError::InvalidVectorTranslation {
+                    mag,
+                    dir: dir.clone(),
+                    rect: self.clone(),
+                })
+            }
         }
         Ok(())
     }
@@ -96,13 +117,24 @@ pub(crate) enum Position {
 }
 
 /// Direction represents the direction indicated by the player.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) enum Direction {
     #[default]
     Left,
     Right,
     Up,
     Down,
+}
+
+impl Direction {
+    pub(crate) fn opposite(&self) -> Direction {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+        }
+    }
 }
 
 impl std::fmt::Display for Direction {
@@ -114,5 +146,76 @@ impl std::fmt::Display for Direction {
             Self::Down => "down",
         };
         write!(f, "{}", s)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rstest::*;
+
+    fn rectangle(x: usize, y: usize, z: usize, width: usize, height: usize) -> Rectangle {
+        Rectangle(Idx(x, y, z), Bounds2D(width, height))
+    }
+
+    #[rstest]
+    #[case::move_right(
+        1,
+        Direction::Right,
+        rectangle(0, 0, 0, 5, 5,),
+        rectangle(1, 0, 0, 5, 5,)
+    )]
+    #[case::move_left(
+        1,
+        Direction::Left,
+        rectangle(10, 0, 0, 5, 5,),
+        rectangle(9, 0, 0, 5, 5,)
+    )]
+    #[case::move_left_to_zero(
+        1,
+        Direction::Left,
+        rectangle(1, 0, 0, 5, 5,),
+        rectangle(0, 0, 0, 5, 5,)
+    )]
+    #[case::move_left_already_at_zero(
+        1,
+        Direction::Left,
+        rectangle(0, 0, 0, 5, 5,),
+        rectangle(0, 0, 0, 5, 5,)
+    )]
+    #[case::move_up(
+        1,
+        Direction::Up,
+        rectangle(0, 10, 0, 5, 5,),
+        rectangle(0, 9, 0, 5, 5,)
+    )]
+    #[case::move_up_to_zero(
+        1,
+        Direction::Up,
+        rectangle(0, 1, 0, 5, 5,),
+        rectangle(0, 0, 0, 5, 5,)
+    )]
+    #[case::move_up_already_at_zero(
+        1,
+        Direction::Up,
+        rectangle(0, 0, 0, 5, 5,),
+        rectangle(0, 0, 0, 5, 5,)
+    )]
+    #[case::move_down(
+        1,
+        Direction::Down,
+        rectangle(0, 0, 0, 5, 5,),
+        rectangle(0, 1, 0, 5, 5,)
+    )]
+    fn rectangle_translate(
+        #[case] magnitude: usize,
+        #[case] direction: Direction,
+        #[case] initial: Rectangle,
+        #[case] expected: Rectangle,
+    ) -> Result<()> {
+        let mut updated = initial.clone();
+        updated.translate(magnitude, direction)?;
+        assert_eq!(expected, updated);
+        Ok(())
     }
 }
