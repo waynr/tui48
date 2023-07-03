@@ -32,6 +32,9 @@ pub(crate) enum Error {
     #[error("unexpected strong reference in smart pointer")]
     UnexpectedStrongReference,
 
+    #[error("cannot convert slot to static tile slot")]
+    CannotConvertToStatic,
+
     #[error("cannot convert slot to sliding tile slot")]
     CannotConvertToSliding,
 

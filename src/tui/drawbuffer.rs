@@ -186,6 +186,19 @@ impl DrawBufferInner {
         Ok(())
     }
 
+    fn switch_layer(&mut self, zdx: usize) -> Result<()> {
+        if self.rectangle.0.2 == zdx {
+            // shh, don't tell the caller that we didn't have to do anything
+            return Ok(())
+        }
+
+        let mut new_rect = self.rectangle.clone();
+        new_rect.0.2 = zdx;
+
+        self.canvas.swap_rectangles(&self.rectangle, &new_rect)?;
+        Ok(())
+    }
+
     fn translate(&mut self, dir: Direction) -> Result<()> {
         self.rectangle.translate(1, &dir)?;
         let canvas_bounds = self.canvas.bounds();
@@ -319,6 +332,10 @@ impl DrawBuffer {
 
     pub(crate) fn translate(&self, dir: Direction) -> Result<()> {
         self.lock().translate(dir)
+    }
+
+    pub(crate) fn switch_layer(&self, zdx: usize) -> Result<()> {
+        self.lock().switch_layer(zdx)
     }
 
     pub(crate) fn rectangle(&self) -> Rectangle {

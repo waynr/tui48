@@ -152,6 +152,14 @@ impl CanvasInner {
 
         Ok(())
     }
+
+    fn swap_rectangles(&mut self, rect1: &Rectangle, rect2: &Rectangle) -> Result<()> {
+        //TODO: verify rect1 and rect2 are not identical
+        //TODO: verify rect1 and rect2 can be swapped
+        //TODO: call swap_tuxels on all pairwise tuxels between the two rectangles
+        unimplemented!("CanvasInner.swap_rectangles");
+        Ok(())
+    }
 }
 
 /// A 2d grid of `Cell`s.
@@ -222,6 +230,10 @@ impl Canvas {
 
     pub(crate) fn swap_tuxels(&self, t1: Idx, t2: Idx) -> Result<()> {
         self.lock().swap_tuxels(t1, t2)
+    }
+
+    pub(crate) fn swap_rectangles(&self, r1: &Rectangle, r2: &Rectangle) -> Result<()> {
+        self.lock().swap_rectangles(r1, r2)
     }
 }
 
