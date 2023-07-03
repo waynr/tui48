@@ -39,6 +39,9 @@ pub(crate) enum TuiError {
     #[error("top tuxel in stack not found")]
     TopTuxelNotFound,
 
+    #[error("drawbuffer translation failed: {0}")]
+    DrawBufferTranslationFailed(String),
+
     #[error("io error")]
     StdIOError(#[from] std::io::Error),
 

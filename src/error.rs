@@ -28,4 +28,10 @@ pub(crate) enum Error {
 
     #[error("unable to retrieve drawbuffer: {reason:?}")]
     UnableToRetrieveDrawBuffer { reason: String },
+
+    #[error("new tile missing during animation")]
+    NewTileMissing,
+
+    #[error("unexpected strong reference in smart pointer")]
+    UnexpectedStrongReference,
 }

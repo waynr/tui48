@@ -178,43 +178,49 @@ impl AnimatedTui48Board {
 
     fn animate(&mut self) -> Result<bool> {
         let hints = self.animation_hint.hints();
-        Ok(hints
-            .iter()
-            .into_iter()
-            .map(|(idx, hint)| {
-                let idx: Idx = idx.into();
-                match hint {
-                    Hint::NewValueToIdx(new_value, to_idx) => {
-                        let to_idx: Idx = to_idx.into();
-                        let shifting_continue = self.animate_shifting_tile(
-                            Some(*new_value),
-                            idx.clone(),
-                            to_idx.clone(),
-                        )?;
-                        self.animate_displaced_tile(to_idx.clone(), shifting_continue)?;
-                        Ok(shifting_continue)
+        let mut continue_animation = false;
+        for (idx, hint) in hints {
+            match hint.clone() {
+                Hint::NewValueToIdx(new_value, to_idx) => {
+                    let should_continue =
+                        self.animate_shifting_tile(Some(new_value), &idx, &to_idx)?;
+                    //self.animate_displaced_tile(to_idx, should_continue)?;
+                    if !should_continue {
+                        self.animation_hint.remove(&idx, &hint);
                     }
-                    Hint::ToIdx(to_idx) => {
-                        let to_idx: Idx = to_idx.into();
-                        let shifting_continue =
-                            self.animate_shifting_tile(None, idx.clone(), to_idx.clone())?;
-                        self.animate_displaced_tile(to_idx.clone(), shifting_continue)?;
-                        Ok(shifting_continue)
-                    }
-                    Hint::NewFrom(new_value, from_dir) => {
-                        self.animate_new_tile(*new_value, idx.clone(), from_dir.clone())
-                    }
+                    continue_animation |= should_continue;
                 }
-            })
-            .collect::<Result<Vec<_>>>()?
-            .iter()
-            .all(|v| *v))
+                Hint::ToIdx(to_idx) => {
+                    let should_continue = self.animate_shifting_tile(None, &idx, &to_idx)?;
+                    //self.animate_displaced_tile(to_idx.clone(), should_continue)?;
+                    if !should_continue {
+                        self.animation_hint.remove(&idx, &hint);
+                    }
+                    continue_animation |= should_continue;
+                }
+                Hint::NewFrom(new_value, from_dir) => {
+                    let should_continue =
+                        self.animate_new_tile(new_value, &idx, from_dir.clone())?;
+                    if !should_continue {
+                        self.animation_hint.remove(&idx, &hint);
+                    }
+                    continue_animation |= should_continue;
+                }
+            }
+        }
+        Ok(continue_animation)
     }
 
-    fn animate_displaced_tile(&mut self, displace_idx: Idx, last_frame: bool) -> Result<bool> {
+    fn animate_displaced_tile(&mut self, displace_idx: &BoardIdx, last_frame: bool) -> Result<()> {
+        if last_frame {
+            // on the last frame, drop the animation buffer
+            self.displace_tile = None;
+            return Ok(());
+        }
+
         let displace_buf = match self.tui_board.slots[displace_idx.y()][displace_idx.x()].take() {
             Some(db) => db,
-            None => return Ok(false),
+            None => return Ok(()),
         };
         let displace_tile = match &self.displace_tile {
             None => {
@@ -231,33 +237,27 @@ impl AnimatedTui48Board {
             Some(dbuf) => dbuf.clone(),
         };
 
-        if last_frame {
-            // on the last frame, drop the buffer
-            self.displace_tile = None;
-            return Ok(false);
-        }
-
         let mut displace_tile = displace_tile.borrow_mut();
         displace_tile.modify(Modifier::AdjustLightnessBG(-0.1));
         displace_tile.modify(Modifier::AdjustLightnessFG(-0.1));
 
-        Ok(true)
+        Ok(())
     }
 
     fn animate_shifting_tile(
         &mut self,
         new_value: Option<u16>,
-        moving_idx: Idx,
-        to_idx: Idx,
+        moving_idx: &BoardIdx,
+        to_idx: &BoardIdx,
     ) -> Result<bool> {
         let target_rectangle = Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), TILE_LAYER_IDX);
 
-        let moving_rectangle = self.tui_board.slots[moving_idx.y()][moving_idx.x()]
-            .as_ref()
-            .ok_or(Error::UnableToRetrieveDrawBuffer {
-                reason: String::from("meow3"),
-            })?
-            .rectangle();
+        let moving_rectangle = match &self.tui_board.slots[moving_idx.y()][moving_idx.x()] {
+            Some(db) => db.rectangle(),
+            // animation already finished
+            // TODO: need to come up with a better way to control flow than this
+            None => return Ok(false),
+        };
 
         // we check for animation termination before doing translation to ensure at least one frame
         // with no translation is available
@@ -344,38 +344,74 @@ impl AnimatedTui48Board {
     fn animate_new_tile(
         &mut self,
         new_value: u16,
-        to_idx: Idx,
-        from_dir: Direction,
+        to_idx: &BoardIdx,
+        shift_dir: Direction,
     ) -> Result<bool> {
         let new_tile = match &self.new_tile {
             None => {
                 // generate new tile
-                let from_idx = match from_dir {
-                    Direction::Left => Idx(0, to_idx.y(), 0),
-                    Direction::Right => Idx(3, to_idx.y(), 0),
-                    Direction::Up => Idx(to_idx.x(), 3, 0),
-                    Direction::Down => Idx(to_idx.x(), 0, 0),
+                let origin_rectangle = match shift_dir {
+                    Direction::Left => {
+                        let mut r =
+                            Tui48Board::tile_rectangle(3, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
+                        r.0 .0 += 5;
+                        r
+                    }
+                    Direction::Right => {
+                        let mut r =
+                            Tui48Board::tile_rectangle(0, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
+                        r.0 .0 -= 5;
+                        r
+                    }
+                    Direction::Up => {
+                        let mut r =
+                            Tui48Board::tile_rectangle(to_idx.x(), 3, UPPER_ANIMATION_LAYER_IDX);
+                        r.0 .1 += 5;
+                        r
+                    }
+                    Direction::Down => {
+                        let mut r =
+                            Tui48Board::tile_rectangle(to_idx.x(), 0, UPPER_ANIMATION_LAYER_IDX);
+                        r.0 .1 -= 5;
+                        r
+                    }
                 };
-                let origin_rectangle =
-                    Tui48Board::tile_rectangle(from_idx.x(), from_idx.y(), TILE_LAYER_IDX);
 
-                let dbuf = Rc::new(RefCell::new(self.canvas.get_draw_buffer(origin_rectangle)?));
+                let mut dbuf = self.canvas.get_draw_buffer(origin_rectangle)?;
+                Tui48Board::draw_tile(&mut dbuf, new_value)?;
+
+                let dbuf = Rc::new(RefCell::new(dbuf));
                 self.new_tile = Some(dbuf.clone());
-                dbuf.borrow_mut().write_center(&format!("{}", new_value))?;
+
                 dbuf
             }
             Some(dbuf) => dbuf.clone(),
         };
 
+        let to_rectangle =
+            Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
+
         // compare new tile rectangle with target to determine if it's time to terminate. on
         // termination, assign new tile to the Tui48Board slot where it belongs
         {
-            if new_tile.borrow().rectangle().0 == to_idx {
-                self.new_tile = None;
+            if new_tile.borrow().rectangle().0 == to_rectangle.0 {
+                drop(new_tile);
+                let new_tile = self.new_tile.take().ok_or(Error::NewTileMissing)?;
                 let t = Rc::into_inner(new_tile)
-                    .expect("there should only be one strong reference to new_tile at this point")
+                    .ok_or(Error::UnexpectedStrongReference)?
                     .into_inner();
-                self.tui_board.slots[to_idx.x()][to_idx.y()] = Some(t);
+                let result = t.clone_to(TILE_LAYER_IDX);
+                let mut new_buf = match result {
+                    Ok(buf) => buf,
+                    // if we get CellAlreadyOwned when attempting to allocate a buffer, wait until
+                    // the next frame to try again
+                    Err(TuiError::CellAlreadyOwned) => return Ok(true),
+                    Err(e) => return Err(e.into()),
+                };
+                Tui48Board::draw_tile(&mut new_buf, new_value)?;
+                self.new_tile = None;
+                drop(t);
+                self.tui_board.slots[to_idx.x()][to_idx.y()] = Some(new_buf);
                 return Ok(false);
             }
         }
