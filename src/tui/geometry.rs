@@ -72,7 +72,7 @@ impl Rectangle {
     }
 
     #[inline(always)]
-    pub(crate) fn translate(&mut self, mag: usize, dir: Direction) -> Result<()> {
+    pub(crate) fn translate(&mut self, mag: usize, dir: &Direction) -> Result<()> {
         match dir {
             Direction::Left if self.x() > mag => self.0 .0 -= mag,
             Direction::Left if self.x() <= mag => self.0 .0 = 0,
@@ -99,7 +99,7 @@ impl Rectangle {
     #[inline(always)]
     pub(crate) fn contains_or_err(&self, idx: &Idx) -> Result<()> {
         if idx.x() < self.x() || idx.x() > self.x() + self.width() {
-            return Err(TuiError::OutOfBoundsY(idx.x()));
+            return Err(TuiError::OutOfBoundsX(idx.x()));
         }
         if idx.y() < self.y() || idx.y() > self.y() + self.height() {
             return Err(TuiError::OutOfBoundsY(idx.y()));
