@@ -73,7 +73,7 @@ const UPPER_ANIMATION_LAYER_IDX: usize = 5;
 impl Tui48Board {
     fn new(game: &Board, canvas: &mut Canvas) -> Result<Self> {
         let board_rectangle = Rectangle(
-            Idx(BOARD_FIXED_X_OFFSET, BOARD_FIXED_Y_OFFSET, 0),
+            Idx(BOARD_FIXED_X_OFFSET, BOARD_FIXED_Y_OFFSET, BOARD_LAYER_IDX),
             Bounds2D(36, 25),
         );
         let (cwidth, cheight) = canvas.dimensions();
@@ -85,7 +85,8 @@ impl Tui48Board {
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
         board.draw_border()?;
 
-        let mut score = canvas.get_draw_buffer(Rectangle(Idx(18, 1, 0), Bounds2D(10, 3)))?;
+        let mut score =
+            canvas.get_draw_buffer(Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3)))?;
         score.draw_border()?;
         score.fill(' ')?;
         score.write_right(&format!("{}", game.score()))?;
@@ -105,14 +106,9 @@ impl Tui48Board {
                 let mut opt = None;
                 let value = round.get(&BoardIdx(x, y));
                 if value > 0 {
-                    let r = Self::tile_rectangle(x, y, 5);
+                    let r = Self::tile_rectangle(x, y, TILE_LAYER_IDX);
                     let mut card_buffer = canvas.get_draw_buffer(r)?;
-                    let colors = colors_from_value(value);
-                    card_buffer.modify(colors.0);
-                    card_buffer.modify(colors.1);
-                    card_buffer.draw_border()?;
-                    card_buffer.fill(' ')?;
-                    card_buffer.write_center(&format!("{}", value))?;
+                    Tui48Board::draw_tile(&mut card_buffer, value)?;
                     opt = Some(card_buffer);
                 }
                 row.push(opt);
@@ -142,6 +138,16 @@ impl Tui48Board {
         );
         let bounds = Bounds2D(TILE_WIDTH, TILE_HEIGHT);
         Rectangle(idx, bounds)
+    }
+
+    fn draw_tile(dbuf: &mut DrawBuffer, value: u16) -> Result<()> {
+        let colors = colors_from_value(value);
+        dbuf.modify(colors.0);
+        dbuf.modify(colors.1);
+        dbuf.draw_border()?;
+        dbuf.fill(' ')?;
+        dbuf.write_center(&format!("{}", value))?;
+        Ok(())
     }
 }
 
