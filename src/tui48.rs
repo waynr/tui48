@@ -274,7 +274,18 @@ impl Slot {
     }
 
     fn to_static(this: Self) -> Result<Self> {
-        Ok(this)
+        // only allow static tiles to be converted to sliding
+        if let Self::Static(_) = this {
+            return Ok(this)
+        }
+
+        if let Self::Sliding(st) = this {
+            let t = st.to_tile();
+            t.buf.switch_layer(TILE_LAYER_IDX)?;
+            return Ok(Slot::Static(t))
+        }
+
+        Err(Error::CannotConvertToStatic)
     }
 }
 
@@ -292,6 +303,12 @@ impl Tile {
 struct SlidingTile {
     inner: Tile,
     to_idx: BoardIdx,
+}
+
+impl SlidingTile {
+    fn to_tile(self) -> Tile {
+        self.inner
+    }
 }
 
 struct Colors {
