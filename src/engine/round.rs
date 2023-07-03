@@ -22,7 +22,7 @@ impl Idx {
 pub(crate) enum Hint {
     ToIdx(Idx),
     NewValueToIdx(u16, Idx),
-    NewFrom(u16, Direction),
+    NewTile(u16, Direction),
 }
 
 #[derive(Default, PartialEq)]
@@ -163,7 +163,7 @@ impl Round {
                 .expect("all rows are populated and at least one row has changed");
             let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(&mut rng)];
             self.set(idx, new_value);
-            hint.set(idx, Hint::NewFrom(new_value, direction.clone()));
+            hint.set(idx, Hint::NewTile(new_value, direction.clone()));
             Some(hint)
         } else {
             None
