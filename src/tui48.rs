@@ -157,241 +157,42 @@ impl From<&BoardIdx> for Idx {
     }
 }
 
-struct AnimatedTui48Board {
-    canvas: Canvas,
-    new_tile: Option<Rc<RefCell<DrawBuffer>>>,
-    displace_tile: Option<Rc<RefCell<DrawBuffer>>>,
-    tui_board: Tui48Board,
-    animation_hint: AnimationHint,
+#[derive(Default)]
+enum Slot {
+    #[default]
+    Empty,
+    Static(Tile),
+    Sliding(SlidingTile),
+    Fading(FadingTile),
 }
 
-impl AnimatedTui48Board {
-    fn new(canvas: Canvas, tui_board: Tui48Board, animation_hint: AnimationHint) -> Self {
-        Self {
-            canvas,
-            new_tile: None,
-            displace_tile: None,
-            tui_board,
-            animation_hint,
-        }
+impl Slot {
+    fn replace(&mut self, other: Self) -> Self {
+        std::mem::replace(self, other)
     }
 
-    fn animate(&mut self) -> Result<bool> {
-        let hints = self.animation_hint.hints();
-        let mut continue_animation = false;
-        for (idx, hint) in hints {
-            match hint.clone() {
-                Hint::NewValueToIdx(new_value, to_idx) => {
-                    let should_continue =
-                        self.animate_shifting_tile(Some(new_value), &idx, &to_idx)?;
-                    if !should_continue {
-                        self.animation_hint.remove(&idx, &hint);
-                    }
-                    continue_animation |= should_continue;
-                }
-                Hint::ToIdx(to_idx) => {
-                    let should_continue = self.animate_shifting_tile(None, &idx, &to_idx)?;
-                    if !should_continue {
-                        self.animation_hint.remove(&idx, &hint);
-                    }
-                    continue_animation |= should_continue;
-                }
-                Hint::NewFrom(new_value, from_dir) => {
-                    let should_continue =
-                        self.animate_new_tile(new_value, &idx, from_dir.clone())?;
-                    if !should_continue {
-                        self.animation_hint.remove(&idx, &hint);
-                    }
-                    continue_animation |= should_continue;
-                }
-            }
-        }
-        Ok(continue_animation)
+    fn take(&mut self) -> Self {
+        std::mem::take(self)
     }
+}
 
-    fn animate_shifting_tile(
-        &mut self,
-        new_value: Option<u16>,
-        moving_idx: &BoardIdx,
-        to_idx: &BoardIdx,
-    ) -> Result<bool> {
-        let target_rectangle = Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), TILE_LAYER_IDX);
+struct Tile {
+    idx: BoardIdx,
+    buf: DrawBuffer,
+}
 
-        let moving_rectangle = match &self.tui_board.slots[moving_idx.y()][moving_idx.x()] {
-            Some(db) => db.rectangle(),
-            // animation already finished
-            // TODO: need to come up with a better way to control flow than this
-            None => return Ok(false),
-        };
-
-        // we check for animation termination before doing translation to ensure at least one frame
-        // with no translation is available
-        if moving_rectangle.x() == target_rectangle.x()
-            && moving_rectangle.y() == target_rectangle.y()
-        {
-            // take ownership of card from its previous slot
-            let mut moving_buf = self.tui_board.slots[moving_idx.y()][moving_idx.x()]
-                .take()
-                .expect("expect the buffer we've been working with not to be empty");
-
-            // on last frame: update content if there is a new value
-            if let Some(new_value) = new_value {
-                let colors = colors_from_value(new_value);
-                moving_buf.modify(colors.0);
-                moving_buf.modify(colors.1);
-                moving_buf.draw_border()?;
-                moving_buf.fill(' ')?;
-                moving_buf.write_center(&format!("{}", new_value))?;
-            }
-
-            // move buffer into destination slot on the tui_board
-            let _ = self.tui_board.slots[to_idx.y()][to_idx.x()].replace(moving_buf);
-
-            return Ok(false);
-        }
-
-        let moving_buf = self.tui_board.slots[moving_idx.y()][moving_idx.x()]
-            .as_mut()
-            .ok_or(Error::UnableToRetrieveDrawBuffer {
-                reason: String::from("meow4"),
-            })?;
-
-        // 1 frame of buffer translation
-        match (
-            moving_idx.x() as i16 - to_idx.x() as i16,
-            moving_idx.y() as i16 - to_idx.y() as i16,
-        ) {
-            (0, 0) => Ok(true), //no translation necessary
-            (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x > 0 => {
-                moving_buf.translate(Direction::Left)?;
-                Ok(true)
-            }
-            (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x < 0 => {
-                moving_buf.translate(Direction::Right)?;
-                Ok(true)
-            }
-            (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y > 0 => {
-                moving_buf.translate(Direction::Up)?;
-                Ok(true)
-            }
-            (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y < 0 => {
-                moving_buf.translate(Direction::Down)?;
-                Ok(true)
-            }
-            (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y > 0 => {
-                moving_buf.translate(Direction::Up)?;
-                Ok(true)
-            }
-            (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y < 0 => {
-                moving_buf.translate(Direction::Down)?;
-                Ok(true)
-            }
-            (x, 0) if x > 0 => {
-                moving_buf.translate(Direction::Left)?;
-                Ok(true)
-            }
-            (x, 0) if x < 0 => {
-                moving_buf.translate(Direction::Right)?;
-                Ok(true)
-            }
-            (0, y) if y > 0 => {
-                moving_buf.translate(Direction::Up)?;
-                Ok(true)
-            }
-            (0, y) if y < 0 => {
-                moving_buf.translate(Direction::Down)?;
-                Ok(true)
-            }
-            _ => Ok(true),
-        }
+impl Tile {
+    fn new(idx: BoardIdx, buf: DrawBuffer) -> Self {
+        Self { idx, buf }
     }
+}
 
-    fn animate_new_tile(
-        &mut self,
-        new_value: u16,
-        to_idx: &BoardIdx,
-        shift_dir: Direction,
-    ) -> Result<bool> {
-        let new_tile = match &self.new_tile {
-            None => {
-                // generate new tile
-                let origin_rectangle = match shift_dir {
-                    Direction::Left => {
-                        let mut r =
-                            Tui48Board::tile_rectangle(3, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
-                        r.0 .0 += 5;
-                        r
-                    }
-                    Direction::Right => {
-                        let mut r =
-                            Tui48Board::tile_rectangle(0, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
-                        r.0 .0 -= 5;
-                        r
-                    }
-                    Direction::Up => {
-                        let mut r =
-                            Tui48Board::tile_rectangle(to_idx.x(), 3, UPPER_ANIMATION_LAYER_IDX);
-                        r.0 .1 += 5;
-                        r
-                    }
-                    Direction::Down => {
-                        let mut r =
-                            Tui48Board::tile_rectangle(to_idx.x(), 0, UPPER_ANIMATION_LAYER_IDX);
-                        r.0 .1 -= 5;
-                        r
-                    }
-                };
+struct FadingTile {
+    inner: Tile,
+}
 
-                let mut dbuf = self.canvas.get_draw_buffer(origin_rectangle)?;
-                Tui48Board::draw_tile(&mut dbuf, new_value)?;
-
-                let dbuf = Rc::new(RefCell::new(dbuf));
-                self.new_tile = Some(dbuf.clone());
-
-                dbuf
-            }
-            Some(dbuf) => dbuf.clone(),
-        };
-
-        let to_rectangle =
-            Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
-
-        // compare new tile rectangle with target to determine if it's time to terminate. on
-        // termination, assign new tile to the Tui48Board slot where it belongs
-        {
-            if new_tile.borrow().rectangle().0 == to_rectangle.0 {
-                drop(new_tile);
-                let new_tile = self.new_tile.take().ok_or(Error::NewTileMissing)?;
-                let t = Rc::into_inner(new_tile)
-                    .ok_or(Error::UnexpectedStrongReference)?
-                    .into_inner();
-                let result = t.clone_to(TILE_LAYER_IDX);
-                let mut new_buf = match result {
-                    Ok(buf) => buf,
-                    // if we get CellAlreadyOwned when attempting to allocate a buffer, wait until
-                    // the next frame to try again
-                    Err(TuiError::CellAlreadyOwned) => return Ok(true),
-                    Err(e) => return Err(e.into()),
-                };
-                Tui48Board::draw_tile(&mut new_buf, new_value)?;
-                self.new_tile = None;
-                drop(t);
-                self.tui_board.slots[to_idx.x()][to_idx.y()] = Some(new_buf);
-                return Ok(false);
-            }
-        }
-
-        // 1 frame of buffer translation
-        {
-            new_tile.borrow_mut().translate(shift_dir)?;
-        }
-
-        Ok(true)
-    }
-
-    fn extract_board(self) -> Tui48Board {
-        self.tui_board
-    }
+struct SlidingTile {
+    inner: Tile,
 }
 
 struct Colors {
@@ -542,14 +343,8 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                 drop(tb);
                 self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
             } else {
-                let mut animation = AnimatedTui48Board::new(
-                    self.canvas.clone(),
-                    self.tui_board
-                        .take()
-                        .expect("tui_board should always be Some at this point"),
-                    hint,
-                );
-                while animation.animate()? {
+                self.board.setup_animation(hint);
+                while self.board.animate()? {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     self.renderer.render(&self.canvas)?;
                 }
