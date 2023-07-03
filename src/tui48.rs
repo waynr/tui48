@@ -292,43 +292,43 @@ impl AnimatedTui48Board {
         ) {
             (0, 0) => Ok(true), //no translation necessary
             (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x > 0 => {
-                moving_buf.translate(1, Direction::Left)?;
+                moving_buf.translate(Direction::Left)?;
                 Ok(true)
             }
             (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x < 0 => {
-                moving_buf.translate(1, Direction::Right)?;
+                moving_buf.translate(Direction::Right)?;
                 Ok(true)
             }
             (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y > 0 => {
-                moving_buf.translate(1, Direction::Up)?;
+                moving_buf.translate(Direction::Up)?;
                 Ok(true)
             }
             (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y < 0 => {
-                moving_buf.translate(1, Direction::Down)?;
+                moving_buf.translate(Direction::Down)?;
                 Ok(true)
             }
             (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y > 0 => {
-                moving_buf.translate(1, Direction::Up)?;
+                moving_buf.translate(Direction::Up)?;
                 Ok(true)
             }
             (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y < 0 => {
-                moving_buf.translate(1, Direction::Down)?;
+                moving_buf.translate(Direction::Down)?;
                 Ok(true)
             }
             (x, 0) if x > 0 => {
-                moving_buf.translate(1, Direction::Left)?;
+                moving_buf.translate(Direction::Left)?;
                 Ok(true)
             }
             (x, 0) if x < 0 => {
-                moving_buf.translate(1, Direction::Right)?;
+                moving_buf.translate(Direction::Right)?;
                 Ok(true)
             }
             (0, y) if y > 0 => {
-                moving_buf.translate(1, Direction::Up)?;
+                moving_buf.translate(Direction::Up)?;
                 Ok(true)
             }
             (0, y) if y < 0 => {
-                moving_buf.translate(1, Direction::Down)?;
+                moving_buf.translate(Direction::Down)?;
                 Ok(true)
             }
             _ => Ok(true),
@@ -376,7 +376,7 @@ impl AnimatedTui48Board {
 
         // 1 frame of buffer translation
         {
-            new_tile.borrow_mut().translate(1, from_dir.opposite())?;
+            new_tile.borrow_mut().translate(shift_dir)?;
         }
 
         Ok(true)

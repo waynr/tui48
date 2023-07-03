@@ -24,7 +24,8 @@ impl DrawBufferInner {
                 // can't write more than width of buffer
                 break;
             }
-            self.get_tuxel(Position::Idx(offset + x, y)).set_content(c);
+            self.get_tuxel_mut(Position::Idx(offset + x, y))?
+                .set_content(c);
         }
         Ok(())
     }
@@ -41,7 +42,8 @@ impl DrawBufferInner {
                 // can't write more than width of buffer
                 break;
             }
-            self.get_tuxel(Position::Idx(x - offset, y)).set_content(c);
+            self.get_tuxel_mut(Position::Idx(x - offset, y))?
+                .set_content(c);
         }
         Ok(())
     }
@@ -61,19 +63,30 @@ impl DrawBufferInner {
             .enumerate()
             .take_while(|(idx, _)| *idx < available_width)
         {
-            self.get_tuxel(Position::Idx(idx + x_offset, y_offset))
+            self.get_tuxel_mut(Position::Idx(idx + x_offset, y_offset))?
                 .set_content(c);
         }
         Ok(())
     }
 
-    fn get_tuxel(&mut self, pos: Position) -> &mut Tuxel {
+    #[inline(always)]
+    fn get_tuxel_mut(&mut self, pos: Position) -> Result<&mut Tuxel> {
         let (x, y) = self.rectangle.relative_idx(&pos);
         self.buf
             .get_mut(y)
-            .map(|row| row.get_mut(x))
-            .flatten()
-            .expect("using the buffer's rectangle should always yield a tuxel")
+            .ok_or(TuiError::OutOfBoundsY(y))?
+            .get_mut(x)
+            .ok_or(TuiError::OutOfBoundsX(x))
+    }
+
+    #[inline(always)]
+    fn get_tuxel(&self, pos: Position) -> Result<&Tuxel> {
+        let (x, y) = self.rectangle.relative_idx(&pos);
+        self.buf
+            .get(y)
+            .ok_or(TuiError::OutOfBoundsY(y))?
+            .get(x)
+            .ok_or(TuiError::OutOfBoundsX(x))
     }
 
     fn rectangle(&self) -> Rectangle {
@@ -114,13 +127,13 @@ impl DrawBufferInner {
         }
 
         // draw corners
-        self.get_tuxel(Position::TopLeft)
+        self.get_tuxel_mut(Position::TopLeft)?
             .set_content(box_corner.clone().into());
-        self.get_tuxel(Position::TopRight)
+        self.get_tuxel_mut(Position::TopRight)?
             .set_content(box_corner.clone().rotate_cw(1).into());
-        self.get_tuxel(Position::BottomRight)
+        self.get_tuxel_mut(Position::BottomRight)?
             .set_content(box_corner.clone().rotate_cw(2).into());
-        self.get_tuxel(Position::BottomLeft)
+        self.get_tuxel_mut(Position::BottomLeft)?
             .set_content(box_corner.clone().rotate_ccw(1).into());
 
         // draw non-corner top
@@ -173,19 +186,17 @@ impl DrawBufferInner {
         Ok(())
     }
 
-    fn translate(&mut self, magnitude: usize, dir: Direction) -> Result<()> {
-        self.rectangle.translate(magnitude, dir.clone())?;
+    fn translate(&mut self, dir: Direction) -> Result<()> {
+        self.rectangle.translate(1, &dir)?;
         let canvas_bounds = self.canvas.bounds();
         match dir {
             Direction::Left => {
                 for t in self.buf.iter_mut().flatten() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    new_idx.0 = if new_idx.0 >= magnitude {
-                        new_idx.0 - magnitude
-                    } else {
-                        0
-                    };
+                    if new_idx.0 > 0 {
+                        new_idx.0 -= 1
+                    } //TODO: figure out how to handle the 0 case
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
@@ -194,10 +205,8 @@ impl DrawBufferInner {
                 for t in self.buf.iter_mut().flatten().rev() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    if new_idx.1 + magnitude <= canvas_bounds.width() {
-                        new_idx.0 += magnitude
-                    } else {
-                        new_idx.0 = canvas_bounds.width() - self.rectangle.width()
+                    if new_idx.0 < canvas_bounds.width() {
+                        new_idx.0 += 1
                     };
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
@@ -207,11 +216,9 @@ impl DrawBufferInner {
                 for t in self.buf.iter_mut().flatten() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    new_idx.1 = if new_idx.1 >= magnitude {
-                        new_idx.1 - magnitude
-                    } else {
-                        0
-                    };
+                    if new_idx.1 > 0 {
+                        new_idx.1 -= 1
+                    }
 
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
@@ -221,17 +228,16 @@ impl DrawBufferInner {
                 for t in self.buf.iter_mut().flatten().rev() {
                     let current_idx = t.idx();
                     let mut new_idx = current_idx.clone();
-                    if new_idx.1 + magnitude <= canvas_bounds.height() {
-                        new_idx.1 += magnitude;
+                    if new_idx.1 < canvas_bounds.height() {
+                        new_idx.1 += 1;
                     } else {
-                        new_idx.1 = canvas_bounds.height() - self.rectangle.height();
+                        return Err(TuiError::DrawBufferTranslationFailed(String::from("")));
                     }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
             }
         }
-        self.rectangle.translate(magnitude, dir)?;
         Ok(())
     }
 }
@@ -239,7 +245,7 @@ impl DrawBufferInner {
 // Tuxel-querying methods.
 impl DrawBufferInner {
     fn tuxel_is_active(&self, x: usize, y: usize) -> Result<bool> {
-        Ok(self.buf[y][x].active())
+        Ok(self.get_tuxel(Position::Idx(x, y))?.active())
     }
 
     fn tuxel_colors(&self, x: usize, y: usize) -> (Option<Rgb>, Option<Rgb>) {
@@ -247,7 +253,7 @@ impl DrawBufferInner {
     }
 
     fn tuxel_content(&self, x: usize, y: usize) -> Result<char> {
-        Ok(self.buf[y][x].content())
+        Ok(self.get_tuxel(Position::Idx(x, y))?.content())
     }
 }
 
@@ -311,8 +317,8 @@ impl DrawBuffer {
         self.lock().write_center(s)
     }
 
-    pub(crate) fn translate(&self, magnitude: usize, dir: Direction) -> Result<()> {
-        self.lock().translate(magnitude, dir)
+    pub(crate) fn translate(&self, dir: Direction) -> Result<()> {
+        self.lock().translate(dir)
     }
 
     pub(crate) fn rectangle(&self) -> Rectangle {
@@ -432,7 +438,6 @@ mod test {
         }
         assert_eq!(count, expected);
     }
-
 
     #[rstest]
     #[case::base(rectangle(0, 0, 0, 5, 5))]
