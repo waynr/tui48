@@ -26,12 +26,15 @@ pub(crate) enum Error {
     #[error("default colors already set")]
     DefaultColorsAlreadySet,
 
-    #[error("unable to retrieve drawbuffer: {reason:?}")]
-    UnableToRetrieveDrawBuffer { reason: String },
-
-    #[error("new tile missing during animation")]
-    NewTileMissing,
+    #[error("unable to retrieve drawbuffer: {context:?}")]
+    UnableToRetrieveSlot { context: String },
 
     #[error("unexpected strong reference in smart pointer")]
     UnexpectedStrongReference,
+
+    #[error("cannot convert slot to sliding tile slot")]
+    CannotConvertToSliding,
+
+    #[error("cannot convert slot to new sliding tile slot")]
+    CannotConvertToNewSlidingTileSlot,
 }

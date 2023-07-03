@@ -17,12 +17,6 @@ use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
 
-struct Tui48Board {
-    _board: DrawBuffer,
-    _score: DrawBuffer,
-    slots: Vec<Vec<Option<DrawBuffer>>>,
-}
-
 /// Generates a 2048 TUI layout with legible numbers.
 ///
 ///  37
@@ -57,6 +51,13 @@ struct Tui48Board {
 ///  6                                 42
 ///
 ///
+struct Tui48Board {
+    canvas: Canvas,
+    _board: DrawBuffer,
+    _score: DrawBuffer,
+    slots: Vec<Vec<Slot>>,
+}
+
 const BOARD_FIXED_Y_OFFSET: usize = 5;
 const BOARD_FIXED_X_OFFSET: usize = 5;
 const BOARD_BORDER_WIDTH: usize = 1;
@@ -103,13 +104,13 @@ impl Tui48Board {
         for y in 0..height {
             let mut row = Vec::with_capacity(width);
             for x in 0..width {
-                let mut opt = None;
+                let mut opt = Slot::Empty;
                 let value = round.get(&BoardIdx(x, y));
                 if value > 0 {
                     let r = Self::tile_rectangle(x, y, TILE_LAYER_IDX);
                     let mut card_buffer = canvas.get_draw_buffer(r)?;
                     Tui48Board::draw_tile(&mut card_buffer, value)?;
-                    opt = Some(card_buffer);
+                    opt = Slot::Static(Tile::new(BoardIdx(x, y), card_buffer));
                 }
                 row.push(opt);
             }
@@ -122,6 +123,7 @@ impl Tui48Board {
         board.modify(Modifier::SetForegroundColor(25, 50, 75));
         board.modify(Modifier::SetFGLightness(0.6));
         Ok(Self {
+            canvas: canvas.clone(),
             _board: board,
             _score: score,
             slots,
@@ -149,6 +151,88 @@ impl Tui48Board {
         dbuf.write_center(&format!("{}", value))?;
         Ok(())
     }
+
+    fn get_slot(&mut self, idx: &BoardIdx) -> Result<Slot> {
+        let s = self
+            .slots
+            .get_mut(idx.y())
+            .ok_or(Error::UnableToRetrieveSlot {
+                context: format!("getting row {}", idx.y()),
+            })?
+            .get_mut(idx.x())
+            .ok_or(Error::UnableToRetrieveSlot {
+                context: format!("getting slot at {},{}", idx.x(), idx.y()),
+            })?;
+        let s = s.take();
+        Ok(s)
+    }
+
+    fn put_slot(&mut self, idx: &BoardIdx, slot: Slot) -> Result<()> {
+        let s = self
+            .slots
+            .get_mut(idx.y())
+            .ok_or(Error::UnableToRetrieveSlot {
+                context: format!("getting row {}", idx.y()),
+            })?
+            .get_mut(idx.x())
+            .ok_or(Error::UnableToRetrieveSlot {
+                context: format!("getting slot at {},{}", idx.x(), idx.y()),
+            })?;
+        let _ = s.replace(slot);
+        Ok(())
+    }
+
+    fn new_sliding_tile(
+        &mut self,
+        to_idx: &BoardIdx,
+        value: u16,
+        direction: &Direction,
+    ) -> Result<SlidingTile> {
+        let (x, y, z) = match direction {
+            Direction::Left => (0, 0, 0),
+            Direction::Right => (0, 0, 0),
+            Direction::Up => (0, 0, 0),
+            Direction::Down => (0, 0, 0),
+        };
+        let db_rectangle = Tui48Board::tile_rectangle(x, y, z);
+        let mut buf = self.canvas.get_draw_buffer(db_rectangle)?;
+        Tui48Board::draw_tile(&mut buf, value)?;
+        let t = Tile {
+            idx: to_idx.clone(),
+            buf,
+        };
+
+        let st = SlidingTile {
+            inner: t,
+            to_idx: to_idx.clone(),
+        };
+
+        Ok(st)
+    }
+
+    fn setup_animation(&mut self, hint: AnimationHint) -> Result<()> {
+        for (idx, hint) in hint.hints() {
+            let mut slot = self.get_slot(&idx)?;
+            match hint {
+                Hint::ToIdx(to_idx) => {
+                    slot = Slot::to_sliding(slot, to_idx, None)?;
+                }
+                Hint::NewValueToIdx(value, to_idx) => {
+                    slot = Slot::to_sliding(slot, to_idx, Some(value))?;
+                }
+                Hint::NewTile(value, slide_direction) => {
+                    let t = self.new_sliding_tile(&idx, value, &slide_direction)?;
+                    let _ = slot.replace(Slot::Sliding(t));
+                }
+            }
+            self.put_slot(&idx, slot)?;
+        }
+        Ok(())
+    }
+
+    fn animate(&mut self) -> Result<bool> {
+        Ok(false)
+    }
 }
 
 impl From<&BoardIdx> for Idx {
@@ -163,7 +247,6 @@ enum Slot {
     Empty,
     Static(Tile),
     Sliding(SlidingTile),
-    Fading(FadingTile),
 }
 
 impl Slot {
@@ -173,6 +256,25 @@ impl Slot {
 
     fn take(&mut self) -> Self {
         std::mem::take(self)
+    }
+
+    fn to_sliding(this: Self, to_idx: BoardIdx, new_value: Option<u16>) -> Result<Self> {
+        // only allow static tiles to be converted to sliding
+        let t = match this {
+            Self::Static(t) => t,
+            Self::Empty => return Err(Error::CannotConvertToSliding),
+            Self::Sliding(_) => return Err(Error::CannotConvertToSliding),
+        };
+
+        t.buf.switch_layer(UPPER_ANIMATION_LAYER_IDX)?;
+
+        let st = SlidingTile { inner: t, to_idx };
+
+        Ok(Slot::Sliding(st))
+    }
+
+    fn to_static(this: Self) -> Result<Self> {
+        Ok(this)
     }
 }
 
@@ -187,12 +289,9 @@ impl Tile {
     }
 }
 
-struct FadingTile {
-    inner: Tile,
-}
-
 struct SlidingTile {
     inner: Tile,
+    to_idx: BoardIdx,
 }
 
 struct Colors {
@@ -343,12 +442,16 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                 drop(tb);
                 self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
             } else {
-                self.board.setup_animation(hint);
-                while self.board.animate()? {
+                let mut tui_board = self
+                    .tui_board
+                    .take()
+                    .expect("why wouldn't we have a tui board at this point?");
+                tui_board.setup_animation(hint)?;
+                while tui_board.animate()? {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     self.renderer.render(&self.canvas)?;
                 }
-                self.tui_board = Some(animation.extract_board());
+                self.tui_board = Some(tui_board);
             }
         }
         Ok(())
