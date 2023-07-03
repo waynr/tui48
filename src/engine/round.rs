@@ -5,7 +5,7 @@ use rand::Rng;
 
 use crate::tui::geometry::Direction;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq)]
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
 impl Idx {
@@ -18,14 +18,14 @@ impl Idx {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub(crate) enum Hint {
     ToIdx(Idx),
     NewValueToIdx(u16, Idx),
     NewFrom(u16, Direction),
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub(crate) struct AnimationHint {
     hint: Vec<(Idx, Hint)>,
     changed: bool,
@@ -45,6 +45,16 @@ impl AnimationHint {
 
     pub(crate) fn hints(&self) -> Vec<(Idx, Hint)> {
         self.hint.clone()
+    }
+
+    pub(crate) fn remove(&mut self, idx: &Idx, hint: &Hint) {
+        let mut remove_idx = 0usize;
+        for (hint_idx, (i, h)) in self.hint.iter().enumerate() {
+            if *i == *idx && *h == *hint {
+                remove_idx = hint_idx;
+            }
+        }
+        let _ = self.hint.remove(remove_idx);
     }
 }
 
