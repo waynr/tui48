@@ -281,9 +281,9 @@ impl Indices {
 
 #[cfg(test)]
 mod test {
-    use rstest::*;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
+    use rstest::*;
 
     use super::*;
     fn rng() -> SmallRng {
