@@ -184,7 +184,6 @@ impl AnimatedTui48Board {
                 Hint::NewValueToIdx(new_value, to_idx) => {
                     let should_continue =
                         self.animate_shifting_tile(Some(new_value), &idx, &to_idx)?;
-                    //self.animate_displaced_tile(to_idx, should_continue)?;
                     if !should_continue {
                         self.animation_hint.remove(&idx, &hint);
                     }
@@ -192,7 +191,6 @@ impl AnimatedTui48Board {
                 }
                 Hint::ToIdx(to_idx) => {
                     let should_continue = self.animate_shifting_tile(None, &idx, &to_idx)?;
-                    //self.animate_displaced_tile(to_idx.clone(), should_continue)?;
                     if !should_continue {
                         self.animation_hint.remove(&idx, &hint);
                     }
@@ -209,39 +207,6 @@ impl AnimatedTui48Board {
             }
         }
         Ok(continue_animation)
-    }
-
-    fn animate_displaced_tile(&mut self, displace_idx: &BoardIdx, last_frame: bool) -> Result<()> {
-        if last_frame {
-            // on the last frame, drop the animation buffer
-            self.displace_tile = None;
-            return Ok(());
-        }
-
-        let displace_buf = match self.tui_board.slots[displace_idx.y()][displace_idx.x()].take() {
-            Some(db) => db,
-            None => return Ok(()),
-        };
-        let displace_tile = match &self.displace_tile {
-            None => {
-                // copy buffer to bottom layer as self.displace_tile
-                let dbuf = Rc::new(RefCell::new(
-                    displace_buf.clone_to(LOWER_ANIMATION_LAYER_IDX)?,
-                ));
-                // drop old buffer, should trigger clear of buffer and return of tuxels to the
-                // canvas
-                drop(displace_buf);
-                self.displace_tile = Some(dbuf.clone());
-                dbuf
-            }
-            Some(dbuf) => dbuf.clone(),
-        };
-
-        let mut displace_tile = displace_tile.borrow_mut();
-        displace_tile.modify(Modifier::AdjustLightnessBG(-0.1));
-        displace_tile.modify(Modifier::AdjustLightnessFG(-0.1));
-
-        Ok(())
     }
 
     fn animate_shifting_tile(
