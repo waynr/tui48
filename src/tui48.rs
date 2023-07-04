@@ -228,6 +228,24 @@ impl Tui48Board {
         Ok(())
     }
 
+    fn teardown_animation(&mut self) -> Result<()> {
+        for idx in self
+            .slots
+            .iter_mut()
+            .map(|i| i.iter())
+            .flatten()
+            .filter(|s| Slot::is_sliding(*s))
+            .map(|s| s.idx())
+            .collect::<Result<Vec<_>>>()?
+        {
+            let slot = self.get_slot(&idx)?;
+            let static_slot = Slot::to_static(slot)?;
+            self.put_slot(&idx, static_slot)?
+        }
+
+        Ok(())
+    }
+
     fn animate(&mut self) -> Result<bool> {
         Ok(self
             .slots
@@ -277,6 +295,21 @@ impl Slot {
         let st = SlidingTile::new(t, rectangle);
 
         Ok(Slot::Sliding(st))
+    }
+
+    fn to_static(this: Self) -> Result<Self> {
+        // only allow static tiles to be converted to sliding
+        if let Self::Static(_) = this {
+            return Ok(this);
+        }
+
+        if let Self::Sliding(st) = this {
+            let t = st.to_tile();
+            t.buf.switch_layer(TILE_LAYER_IDX)?;
+            return Ok(Slot::Static(t));
+        }
+
+        Err(Error::CannotConvertToStatic)
     }
 
     fn idx(&self) -> Result<BoardIdx> {
@@ -566,6 +599,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     self.renderer.render(&self.canvas)?;
                 }
+                tui_board.teardown_animation()?;
                 self.tui_board = Some(tui_board);
             }
         }
