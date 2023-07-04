@@ -215,7 +215,7 @@ impl Tui48Board {
             buf,
         };
 
-        let rectangle = Tui48Board::tile_rectangle(to_idx.0, to_idx.1, UPPER_ANIMATION_LAYER_IDX);
+        let rectangle = Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
         let st = SlidingTile::new(t, rectangle);
 
         Ok(st)
@@ -224,19 +224,19 @@ impl Tui48Board {
     fn setup_animation(&mut self, hint: AnimationHint) -> Result<()> {
         for (idx, hint) in hint.hints() {
             let mut slot = self.get_slot(&idx)?;
-            match hint {
+            let new_slot = match hint {
                 Hint::ToIdx(to_idx) => {
-                    slot = Slot::to_sliding(slot, to_idx, None)?;
+                    Slot::to_sliding(slot, to_idx, None)?
                 }
                 Hint::NewValueToIdx(value, to_idx) => {
-                    slot = Slot::to_sliding(slot, to_idx, Some(value))?;
+                    Slot::to_sliding(slot, to_idx, Some(value))?
                 }
                 Hint::NewTile(value, slide_direction) => {
                     let t = self.new_sliding_tile(&idx, value, &slide_direction)?;
-                    slot = Slot::Sliding(t);
+                    Slot::Sliding(t)
                 }
-            }
-            self.put_slot(&idx, slot)?;
+            };
+            self.put_slot(&idx, new_slot)?;
         }
         Ok(())
     }
