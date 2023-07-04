@@ -145,12 +145,12 @@ impl Iterator for Indices {
                 self.current_x = 0;
                 self.current_y += 1;
                 Some(idx)
-            },
+            }
             (x, y) if (x < self.to_x) => {
                 let idx = Idx(x, y, self.z);
                 self.current_x += 1;
                 Some(idx)
-            },
+            }
             (_, _) => unreachable!(),
         }
     }
