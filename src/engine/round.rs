@@ -38,6 +38,7 @@ impl AnimationHint {
             changed: false,
         }
     }
+
     fn set(&mut self, idx: &Idx, value: Hint) {
         self.changed = true;
         self.hint.push((idx.clone(), value));
