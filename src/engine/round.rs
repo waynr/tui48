@@ -5,7 +5,7 @@ use rand::Rng;
 
 use crate::tui::geometry::Direction;
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
 impl Idx {

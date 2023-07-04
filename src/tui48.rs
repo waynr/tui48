@@ -298,10 +298,18 @@ impl Slot {
 
     fn to_sliding(this: Self, to_idx: BoardIdx, new_value: Option<u16>) -> Result<Self> {
         // only allow static tiles to be converted to sliding
-        let t = match this {
+        let mut t = match this {
             Self::Static(t) => t,
-            Self::Empty => return Err(Error::CannotConvertToSliding),
-            Self::Sliding(_) => return Err(Error::CannotConvertToSliding),
+            Self::Empty => {
+                return Err(Error::CannotConvertToSliding {
+                    idx: to_idx.clone(),
+                })
+            }
+            Self::Sliding(_) => {
+                return Err(Error::CannotConvertToSliding {
+                    idx: to_idx.clone(),
+                })
+            }
         };
 
         t.buf.switch_layer(UPPER_ANIMATION_LAYER_IDX)?;

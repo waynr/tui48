@@ -35,8 +35,8 @@ pub(crate) enum Error {
     #[error("cannot convert slot to static tile slot")]
     CannotConvertToStatic,
 
-    #[error("cannot convert slot to sliding tile slot")]
-    CannotConvertToSliding,
+    #[error("cannot convert {idx:?} to sliding tile slot")]
+    CannotConvertToSliding { idx: crate::engine::round::Idx },
 
     #[error("cannot convert slot to new sliding tile slot")]
     CannotConvertToNewSlidingTileSlot,
