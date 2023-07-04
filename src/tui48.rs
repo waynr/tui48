@@ -56,6 +56,9 @@ struct Tui48Board {
     _board: DrawBuffer,
     _score: DrawBuffer,
     slots: Vec<Vec<Slot>>,
+    disappearing_slots: Vec<Slot>,
+    moving_slots: Vec<Slot>,
+    done_slots: Vec<Slot>,
 }
 
 const BOARD_FIXED_Y_OFFSET: usize = 5;
@@ -110,7 +113,7 @@ impl Tui48Board {
                     let r = Self::tile_rectangle(x, y, TILE_LAYER_IDX);
                     let mut card_buffer = canvas.get_draw_buffer(r)?;
                     Tui48Board::draw_tile(&mut card_buffer, value)?;
-                    opt = Slot::Static(Tile::new(BoardIdx(x, y), card_buffer));
+                    opt = Slot::Static(Tile::new(value, BoardIdx(x, y), card_buffer));
                 }
                 row.push(opt);
             }
@@ -127,6 +130,9 @@ impl Tui48Board {
             _board: board,
             _score: score,
             slots,
+            moving_slots: Vec::new(),
+            done_slots: Vec::new(),
+            disappearing_slots: Vec::new(),
         })
     }
 
@@ -208,64 +214,66 @@ impl Tui48Board {
                 r
             }
         };
-        let mut buf = self.canvas.get_draw_buffer(db_rectangle)?;
-        Tui48Board::draw_tile(&mut buf, value)?;
-        let t = Tile {
-            idx: to_idx.clone(),
-            buf,
-        };
+        let buf = self.canvas.get_draw_buffer(db_rectangle)?;
+        let mut t = Tile::new(value, to_idx.clone(), buf);
+        t.draw()?;
 
-        let rectangle = Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
-        let st = SlidingTile::new(t, rectangle);
+        let rectangle =
+            Tui48Board::tile_rectangle(to_idx.x(), to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
+        let st = SlidingTile::new(t, rectangle, None);
 
         Ok(st)
     }
 
-    fn setup_animation(&mut self, hint: AnimationHint) -> Result<()> {
-        for (idx, hint) in hint.hints() {
-            let mut slot = self.get_slot(&idx)?;
+    fn setup_animation(&mut self, hints: AnimationHint) -> Result<()> {
+        for (idx, hint) in hints.hints() {
+            let slot = self.get_slot(&idx)?;
             let new_slot = match hint {
-                Hint::ToIdx(to_idx) => {
-                    Slot::to_sliding(slot, to_idx, None)?
-                }
-                Hint::NewValueToIdx(value, to_idx) => {
-                    Slot::to_sliding(slot, to_idx, Some(value))?
-                }
+                Hint::ToIdx(to_idx) => Slot::to_sliding(slot, to_idx, None)?,
+                Hint::NewValueToIdx(value, to_idx) => Slot::to_sliding(slot, to_idx, Some(value))?,
                 Hint::NewTile(value, slide_direction) => {
                     let t = self.new_sliding_tile(&idx, value, &slide_direction)?;
                     Slot::Sliding(t)
                 }
             };
-            self.put_slot(&idx, new_slot)?;
+            self.moving_slots.push(new_slot);
         }
         Ok(())
     }
 
     fn teardown_animation(&mut self) -> Result<()> {
-        for idx in self
-            .slots
-            .iter_mut()
-            .map(|i| i.iter())
-            .flatten()
-            .filter(|s| Slot::is_sliding(*s))
-            .map(|s| s.idx())
+        for slot in self
+            .done_slots
+            .drain(0..)
+            .map(Slot::to_static)
             .collect::<Result<Vec<_>>>()?
+            .into_iter()
         {
-            let slot = self.get_slot(&idx)?;
-            let static_slot = Slot::to_static(slot)?;
-            self.put_slot(&idx, static_slot)?
+            let idx = slot.idx()?;
+            self.put_slot(&idx, slot)?;
         }
+        self.moving_slots = Vec::new();
 
         Ok(())
     }
 
     fn animate(&mut self) -> Result<bool> {
         let should_continue = self
-            .slots
+            .moving_slots
             .iter_mut()
-            .flatten()
-            .filter(|slot| Slot::is_animating(*slot))
-            .map(|slot| slot.animate())
+            .chain(self.disappearing_slots.iter_mut())
+            .map(|slot| {
+                match slot {
+                    Slot::Empty => return Ok(false),
+                    _ => (),
+                }
+                let c = slot.animate()?;
+                if !c {
+                    let s = slot.take();
+                    self.done_slots.push(s);
+                }
+                Ok(c)
+            })
             .collect::<Result<Vec<bool>>>()?
             .iter()
             .fold(false, |b, n| b | n);
@@ -300,39 +308,36 @@ impl Slot {
         // only allow static tiles to be converted to sliding
         let mut t = match this {
             Self::Static(t) => t,
-            Self::Empty => {
-                return Err(Error::CannotConvertToSliding {
-                    idx: to_idx.clone(),
-                })
-            }
+            Self::Empty => return Err(Error::CannotConvertToSliding { idx: None }),
             Self::Sliding(_) => {
                 return Err(Error::CannotConvertToSliding {
-                    idx: to_idx.clone(),
+                    idx: Some(this.idx()?),
                 })
             }
         };
 
         t.buf.switch_layer(UPPER_ANIMATION_LAYER_IDX)?;
+        t.idx = to_idx.clone();
         if let Some(v) = new_value {
-            Tui48Board::draw_tile(&mut t.buf, v)?;
-        } else {
-            Tui48Board::draw_tile(&mut t.buf, 5)?;
+            t.value = v;
         }
-        let to_rectangle = Tui48Board::tile_rectangle(to_idx.0, to_idx.1, UPPER_ANIMATION_LAYER_IDX);
-        let st = SlidingTile::new(t, to_rectangle);
+        let to_rectangle =
+            Tui48Board::tile_rectangle(to_idx.0, to_idx.1, UPPER_ANIMATION_LAYER_IDX);
+        let st = SlidingTile::new(t, to_rectangle, new_value);
 
         Ok(Slot::Sliding(st))
     }
 
     fn to_static(this: Self) -> Result<Self> {
-        // only allow static tiles to be converted to sliding
         if let Self::Static(_) = this {
             return Ok(this);
         }
 
+        // only allow sliding tiles to be converted to static
         if let Self::Sliding(st) = this {
-            let t = st.to_tile();
+            let mut t = st.to_tile();
             t.buf.switch_layer(TILE_LAYER_IDX)?;
+            t.draw()?;
             return Ok(Slot::Static(t));
         }
 
@@ -348,21 +353,6 @@ impl Slot {
         }
     }
 
-    fn is_sliding(this: &Self) -> bool {
-        match this {
-            Slot::Sliding(_) => true,
-            _ => false,
-        }
-    }
-
-    fn is_animating(this: &Self) -> bool {
-        match this {
-            Slot::Empty => false,
-            Slot::Static(_) => false,
-            Slot::Sliding(st) => st.is_animating(),
-        }
-    }
-
     fn animate(&mut self) -> Result<bool> {
         match self {
             Slot::Empty => Ok(false),
@@ -373,13 +363,18 @@ impl Slot {
 }
 
 struct Tile {
+    value: u16,
     idx: BoardIdx,
     buf: DrawBuffer,
 }
 
 impl Tile {
-    fn new(idx: BoardIdx, buf: DrawBuffer) -> Self {
-        Self { idx, buf }
+    fn new(value: u16, idx: BoardIdx, buf: DrawBuffer) -> Self {
+        Self { value, idx, buf }
+    }
+
+    fn draw(&mut self) -> Result<()> {
+        Tui48Board::draw_tile(&mut self.buf, self.value)
     }
 }
 
@@ -387,23 +382,21 @@ struct SlidingTile {
     inner: Tile,
     to_rectangle: Rectangle,
     is_animating: bool,
+    new_value: Option<u16>,
 }
 
 impl SlidingTile {
-    fn new(inner: Tile, to_rectangle: Rectangle) -> Self {
+    fn new(inner: Tile, to_rectangle: Rectangle, new_value: Option<u16>) -> Self {
         Self {
             inner,
             to_rectangle,
             is_animating: true,
+            new_value,
         }
     }
 
     fn to_tile(self) -> Tile {
         self.inner
-    }
-
-    fn is_animating(&self) -> bool {
-        self.is_animating
     }
 
     fn animate(&mut self) -> Result<bool> {
@@ -416,6 +409,9 @@ impl SlidingTile {
         {
             // final frame
             self.inner.buf.switch_layer(TILE_LAYER_IDX)?;
+            if let Some(v) = self.new_value {
+                self.inner.value = v;
+            }
             self.is_animating = false;
             return Ok(false);
         }
@@ -630,7 +626,8 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     self.renderer.render(&self.canvas)?;
                 }
                 tui_board.teardown_animation()?;
-                self.tui_board = Some(tui_board);
+                self.renderer.render(&self.canvas)?;
+                let _ = self.tui_board.replace(tui_board);
             }
         }
         Ok(())
