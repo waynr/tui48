@@ -260,7 +260,7 @@ impl Tui48Board {
     }
 
     fn animate(&mut self) -> Result<bool> {
-        Ok(self
+        let should_continue = self
             .slots
             .iter_mut()
             .flatten()
@@ -268,7 +268,8 @@ impl Tui48Board {
             .map(|slot| slot.animate())
             .collect::<Result<Vec<bool>>>()?
             .iter()
-            .any(|b| *b))
+            .fold(false, |b, n| b | n);
+        Ok(should_continue)
     }
 }
 
