@@ -189,12 +189,7 @@ mod test {
         rectangle(0, 10, 0, 5, 5,),
         rectangle(0, 9, 0, 5, 5,)
     )]
-    #[case::move_up_to_zero(
-        1,
-        Direction::Up,
-        rectangle(0, 1, 0, 5, 5,),
-        rectangle(0, 0, 0, 5, 5,)
-    )]
+    #[case::move_up_to_zero(1, Direction::Up, rectangle(0, 1, 0, 5, 5,), rectangle(0, 0, 0, 5, 5,))]
     #[case::move_up_already_at_zero(
         1,
         Direction::Up,
