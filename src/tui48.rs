@@ -190,20 +190,20 @@ impl Tui48Board {
     ) -> Result<SlidingTile> {
         let db_rectangle = match direction {
             Direction::Left => {
-                let r = Tui48Board::tile_rectangle(4, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
+                let r = Tui48Board::tile_rectangle(4, to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
                 r
             }
             Direction::Right => {
-                let mut r = Tui48Board::tile_rectangle(0, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
+                let mut r = Tui48Board::tile_rectangle(0, to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
                 r.0 .0 -= 6;
                 r
             }
             Direction::Up => {
-                let r = Tui48Board::tile_rectangle(to_idx.x(), 4, UPPER_ANIMATION_LAYER_IDX);
+                let r = Tui48Board::tile_rectangle(to_idx.x(), 4, LOWER_ANIMATION_LAYER_IDX);
                 r
             }
             Direction::Down => {
-                let mut r = Tui48Board::tile_rectangle(to_idx.x(), 0, UPPER_ANIMATION_LAYER_IDX);
+                let mut r = Tui48Board::tile_rectangle(to_idx.x(), 0, LOWER_ANIMATION_LAYER_IDX);
                 r.0 .1 -= 6;
                 r
             }
@@ -313,8 +313,13 @@ impl Slot {
         };
 
         t.buf.switch_layer(UPPER_ANIMATION_LAYER_IDX)?;
-        let rectangle = Tui48Board::tile_rectangle(to_idx.0, to_idx.1, UPPER_ANIMATION_LAYER_IDX);
-        let st = SlidingTile::new(t, rectangle);
+        if let Some(v) = new_value {
+            Tui48Board::draw_tile(&mut t.buf, v)?;
+        } else {
+            Tui48Board::draw_tile(&mut t.buf, 5)?;
+        }
+        let to_rectangle = Tui48Board::tile_rectangle(to_idx.0, to_idx.1, UPPER_ANIMATION_LAYER_IDX);
+        let st = SlidingTile::new(t, to_rectangle);
 
         Ok(Slot::Sliding(st))
     }
