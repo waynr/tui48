@@ -398,7 +398,9 @@ impl SlidingTile {
             return Ok(false);
         }
 
-        if self.inner.buf.rectangle() == self.to_rectangle {
+        if self.inner.buf.rectangle().0.x() == self.to_rectangle.0.x()
+            && self.inner.buf.rectangle().0.y() == self.to_rectangle.0.y()
+        {
             // final frame
             self.inner.buf.switch_layer(TILE_LAYER_IDX)?;
             self.is_animating = false;
