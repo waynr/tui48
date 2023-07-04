@@ -187,15 +187,21 @@ impl DrawBufferInner {
     }
 
     fn switch_layer(&mut self, zdx: usize) -> Result<()> {
-        if self.rectangle.0.2 == zdx {
+        if self.rectangle.0 .2 == zdx {
             // shh, don't tell the caller that we didn't have to do anything
-            return Ok(())
+            return Ok(());
         }
 
         let old = self.rectangle.clone();
-        self.rectangle.0.2 = zdx;
+        self.rectangle.0 .2 = zdx;
 
         self.canvas.swap_rectangles(&self.rectangle, &old)?;
+
+        for tuxel in self.buf.iter_mut().map(|v| v.iter_mut()).flatten() {
+            let mut idx = tuxel.idx();
+            idx.2 = zdx;
+            tuxel.set_idx(&idx);
+        }
         Ok(())
     }
 
