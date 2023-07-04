@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use super::colors::Rgb;
 use super::drawbuffer::{DBTuxel, DrawBuffer};
 use super::error::{Result, TuiError};
-use super::geometry::{Bounds2D, Idx, Rectangle};
+use super::geometry::{Bounds2D, Indices, Idx, Rectangle};
 use super::tuxel::Tuxel;
 
 struct CanvasInner {
@@ -154,10 +154,16 @@ impl CanvasInner {
     }
 
     fn swap_rectangles(&mut self, rect1: &Rectangle, rect2: &Rectangle) -> Result<()> {
-        //TODO: verify rect1 and rect2 are not identical
+        if rect1 == rect2 {
+            // donzo!
+            return Ok(())
+        }
         //TODO: verify rect1 and rect2 can be swapped
-        //TODO: call swap_tuxels on all pairwise tuxels between the two rectangles
-        unimplemented!("CanvasInner.swap_rectangles");
+        let rect1_indices: Indices = rect1.clone().into();
+        let rect2_indices: Indices = rect2.clone().into();
+        for (idx1, idx2) in rect1_indices.zip(rect2_indices) {
+            self.swap_tuxels(idx1, idx2)?
+        }
         Ok(())
     }
 }

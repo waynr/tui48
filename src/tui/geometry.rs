@@ -56,6 +56,11 @@ impl Rectangle {
     }
 
     #[inline(always)]
+    pub(crate) fn z(&self) -> usize {
+        self.0 .2
+    }
+
+    #[inline(always)]
     pub(crate) fn y(&self) -> usize {
         self.0 .1
     }
@@ -105,6 +110,49 @@ impl Rectangle {
             return Err(TuiError::OutOfBoundsY(idx.y()));
         }
         Ok(())
+    }
+}
+
+pub(crate) struct Indices {
+    current_x: usize,
+    to_x: usize,
+
+    current_y: usize,
+    to_y: usize,
+
+    z: usize,
+}
+
+impl From<Rectangle> for Indices {
+    fn from(r: Rectangle) -> Indices {
+        Indices {
+            z: r.z(),
+            current_x: r.x(),
+            current_y: r.y(),
+            to_x: r.x() + r.width(),
+            to_y: r.y() + r.height(),
+        }
+    }
+}
+
+impl Iterator for Indices {
+    type Item = Idx;
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.current_x, self.current_y) {
+            (x, y) if (x == self.to_x && y == self.to_y) => None,
+            (x, y) if (x == self.to_x && y < self.to_y) => {
+                let idx = Idx(x, y, self.z);
+                self.current_x = 0;
+                self.current_y += 1;
+                Some(idx)
+            },
+            (x, y) if (x < self.to_x) => {
+                let idx = Idx(x, y, self.z);
+                self.current_x += 1;
+                Some(idx)
+            },
+            (_, _) => unreachable!(),
+        }
     }
 }
 
