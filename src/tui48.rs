@@ -233,7 +233,7 @@ impl Tui48Board {
                 }
                 Hint::NewTile(value, slide_direction) => {
                     let t = self.new_sliding_tile(&idx, value, &slide_direction)?;
-                    let _ = slot.replace(Slot::Sliding(t));
+                    slot = Slot::Sliding(t);
                 }
             }
             self.put_slot(&idx, slot)?;
