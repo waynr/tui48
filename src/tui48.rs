@@ -188,13 +188,26 @@ impl Tui48Board {
         value: u16,
         direction: &Direction,
     ) -> Result<SlidingTile> {
-        let (x, y, z) = match direction {
-            Direction::Left => (0, 0, 0),
-            Direction::Right => (0, 0, 0),
-            Direction::Up => (0, 0, 0),
-            Direction::Down => (0, 0, 0),
+        let db_rectangle = match direction {
+            Direction::Left => {
+                let r = Tui48Board::tile_rectangle(4, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
+                r
+            }
+            Direction::Right => {
+                let mut r = Tui48Board::tile_rectangle(0, to_idx.y(), UPPER_ANIMATION_LAYER_IDX);
+                r.0 .0 -= 6;
+                r
+            }
+            Direction::Up => {
+                let r = Tui48Board::tile_rectangle(to_idx.x(), 4, UPPER_ANIMATION_LAYER_IDX);
+                r
+            }
+            Direction::Down => {
+                let mut r = Tui48Board::tile_rectangle(to_idx.x(), 0, UPPER_ANIMATION_LAYER_IDX);
+                r.0 .1 -= 6;
+                r
+            }
         };
-        let db_rectangle = Tui48Board::tile_rectangle(x, y, z);
         let mut buf = self.canvas.get_draw_buffer(db_rectangle)?;
         Tui48Board::draw_tile(&mut buf, value)?;
         let t = Tile {
