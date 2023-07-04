@@ -336,8 +336,8 @@ impl Slot {
 
     fn is_sliding(this: &Self) -> bool {
         match this {
-            _ => false,
             Slot::Sliding(_) => true,
+            _ => false,
         }
     }
 
