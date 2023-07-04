@@ -622,7 +622,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     .expect("why wouldn't we have a tui board at this point?");
                 tui_board.setup_animation(hint)?;
                 while tui_board.animate()? {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    std::thread::sleep(std::time::Duration::from_millis(1));
                     self.renderer.render(&self.canvas)?;
                 }
                 tui_board.teardown_animation()?;
