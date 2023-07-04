@@ -11,6 +11,9 @@ pub(crate) enum Error {
     #[error("io error")]
     StdIOError(#[from] std::io::Error),
 
+    #[error("log error")]
+    LogError(#[from] log::SetLoggerError),
+
     #[error("{source:?}")]
     AnyhowError {
         #[from]

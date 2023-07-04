@@ -17,6 +17,8 @@ boxy = "0.1"
 rand = "0.8.5"
 thiserror = "1.0"
 anyhow = "1.0"
+log = "0.4"
+fern = "0.6"
 
 palette = "0.7"
 
