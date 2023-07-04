@@ -202,10 +202,8 @@ impl Tui48Board {
             buf,
         };
 
-        let st = SlidingTile {
-            inner: t,
-            to_idx: to_idx.clone(),
-        };
+        let rectangle = Tui48Board::tile_rectangle(to_idx.0, to_idx.1, UPPER_ANIMATION_LAYER_IDX);
+        let st = SlidingTile::new(t, rectangle);
 
         Ok(st)
     }
@@ -231,7 +229,15 @@ impl Tui48Board {
     }
 
     fn animate(&mut self) -> Result<bool> {
-        Ok(false)
+        Ok(self
+            .slots
+            .iter_mut()
+            .flatten()
+            .filter(|slot| Slot::is_animating(*slot))
+            .map(|slot| slot.animate())
+            .collect::<Result<Vec<bool>>>()?
+            .iter()
+            .any(|b| *b))
     }
 }
 
@@ -267,25 +273,41 @@ impl Slot {
         };
 
         t.buf.switch_layer(UPPER_ANIMATION_LAYER_IDX)?;
-
-        let st = SlidingTile { inner: t, to_idx };
+        let rectangle = Tui48Board::tile_rectangle(to_idx.0, to_idx.1, UPPER_ANIMATION_LAYER_IDX);
+        let st = SlidingTile::new(t, rectangle);
 
         Ok(Slot::Sliding(st))
     }
 
-    fn to_static(this: Self) -> Result<Self> {
-        // only allow static tiles to be converted to sliding
-        if let Self::Static(_) = this {
-            return Ok(this)
+    fn idx(&self) -> Result<BoardIdx> {
+        //BoardIdx::default()
+        match self {
+            Slot::Empty => unreachable!(),
+            Slot::Static(t) => Ok(t.idx.clone()),
+            Slot::Sliding(st) => Ok(st.inner.idx.clone()),
         }
+    }
 
-        if let Self::Sliding(st) = this {
-            let t = st.to_tile();
-            t.buf.switch_layer(TILE_LAYER_IDX)?;
-            return Ok(Slot::Static(t))
+    fn is_sliding(this: &Self) -> bool {
+        match this {
+            _ => false,
+            Slot::Sliding(_) => true,
         }
+    }
+    fn is_animating(this: &Self) -> bool {
+        match this {
+            Slot::Empty => false,
+            Slot::Static(_) => false,
+            Slot::Sliding(st) => st.is_animating(),
+        }
+    }
 
-        Err(Error::CannotConvertToStatic)
+    fn animate(&mut self) -> Result<bool> {
+        match self {
+            Slot::Empty => Ok(false),
+            Slot::Static(_) => Ok(false),
+            Slot::Sliding(st) => st.animate(),
+        }
     }
 }
 
@@ -302,12 +324,88 @@ impl Tile {
 
 struct SlidingTile {
     inner: Tile,
-    to_idx: BoardIdx,
+    to_rectangle: Rectangle,
+    is_animating: bool,
 }
 
 impl SlidingTile {
+    fn new(inner: Tile, to_rectangle: Rectangle) -> Self {
+        Self {
+            inner,
+            to_rectangle,
+            is_animating: true,
+        }
+    }
+
     fn to_tile(self) -> Tile {
         self.inner
+    }
+
+    fn is_animating(&self) -> bool {
+        self.is_animating
+    }
+
+    fn animate(&mut self) -> Result<bool> {
+        if !self.is_animating {
+            return Ok(false);
+        }
+
+        if self.inner.buf.rectangle() == self.to_rectangle {
+            // final frame
+            self.inner.buf.switch_layer(TILE_LAYER_IDX)?;
+            self.is_animating = false;
+            return Ok(false);
+        }
+        let moving_idx = self.inner.buf.rectangle().0;
+        let to_idx = &self.to_rectangle.0;
+        let moving_buf = &self.inner.buf;
+        match (
+            moving_idx.x() as i16 - to_idx.x() as i16,
+            moving_idx.y() as i16 - to_idx.y() as i16,
+        ) {
+            (0, 0) => Ok(true), //no translation necessary
+            (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x > 0 => {
+                moving_buf.translate(Direction::Left)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() > y.abs() && x < 0 => {
+                moving_buf.translate(Direction::Right)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y > 0 => {
+                moving_buf.translate(Direction::Up)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() < y.abs() && y < 0 => {
+                moving_buf.translate(Direction::Down)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y > 0 => {
+                moving_buf.translate(Direction::Up)?;
+                Ok(true)
+            }
+            (x, y) if x != 0 && y != 0 && x.abs() == y.abs() && y < 0 => {
+                moving_buf.translate(Direction::Down)?;
+                Ok(true)
+            }
+            (x, 0) if x > 0 => {
+                moving_buf.translate(Direction::Left)?;
+                Ok(true)
+            }
+            (x, 0) if x < 0 => {
+                moving_buf.translate(Direction::Right)?;
+                Ok(true)
+            }
+            (0, y) if y > 0 => {
+                moving_buf.translate(Direction::Up)?;
+                Ok(true)
+            }
+            (0, y) if y < 0 => {
+                moving_buf.translate(Direction::Down)?;
+                Ok(true)
+            }
+            _ => Ok(true),
+        }
     }
 }
 
