@@ -340,6 +340,7 @@ impl Slot {
             Slot::Sliding(_) => true,
         }
     }
+
     fn is_animating(this: &Self) -> bool {
         match this {
             Slot::Empty => false,
