@@ -192,10 +192,10 @@ impl DrawBufferInner {
             return Ok(())
         }
 
-        let mut new_rect = self.rectangle.clone();
-        new_rect.0.2 = zdx;
+        let old = self.rectangle.clone();
+        self.rectangle.0.2 = zdx;
 
-        self.canvas.swap_rectangles(&self.rectangle, &new_rect)?;
+        self.canvas.swap_rectangles(&self.rectangle, &old)?;
         Ok(())
     }
 
