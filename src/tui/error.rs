@@ -50,4 +50,7 @@ pub(crate) enum TuiError {
         #[from]
         source: anyhow::Error,
     },
+
+    #[error("exceeded retry limit for locking drawbuffer: {0:?}")]
+    ExceedRetryLimitForLockingDrawBuffer(String),
 }

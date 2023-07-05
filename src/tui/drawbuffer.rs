@@ -217,6 +217,7 @@ impl DrawBufferInner {
                         new_idx.0 -= 1
                     } //TODO: figure out how to handle the 0 case
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
                 }
             }
             Direction::Right => {
@@ -227,6 +228,7 @@ impl DrawBufferInner {
                         new_idx.0 += 1
                     };
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
                 }
             }
             Direction::Up => {
@@ -238,6 +240,7 @@ impl DrawBufferInner {
                     }
 
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
                 }
             }
             Direction::Down => {
@@ -250,6 +253,7 @@ impl DrawBufferInner {
                         return Err(TuiError::DrawBufferTranslationFailed(String::from("")));
                     }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
+                    t.set_idx(&new_idx);
                 }
             }
         }
@@ -408,7 +412,43 @@ impl DBTuxel {
 
     pub(crate) fn set_canvas_idx(&mut self, new_idx: &Idx) -> Result<()> {
         self.canvas_idx = new_idx.clone();
-        let mut dbi = self.lock();
+        // NOTE: in the early stages of development the only case i can think of where this would
+        // block is when swapping tuxels for a specific draw buffer. since the actual high-level
+        // operation in such cases requires the DrawBufferInner corresponding to this DBTuxel to
+        // already be locked. in those cases it is the DrawBuffer's responsibility to ensure tuxel
+        // canvas indices are set properly.
+        //
+        // but since there may come a time in the near future where drawbuffers and canvases are
+        // managed by separate threads there is the possibility of a coincidental and ephemeral
+        // (rather than deadlocking) simultaneous lock -- because of that we should retry a few
+        // times
+        let retry_count = 0usize;
+        let max_retries = 5usize;
+        let mut dbi = match (retry_count..max_retries).into_iter().find_map(
+            |i| -> Option<MutexGuard<DrawBufferInner>> {
+                match self.parent.try_lock() {
+                    Ok(guard) => Some(guard),
+                    Err(std::sync::TryLockError::WouldBlock) => {
+                        std::thread::sleep(std::time::Duration::from_millis(i as u64 * 5));
+                        None
+                    },
+                    Err(std::sync::TryLockError::Poisoned(p_err)) => {
+                        let recovered = p_err.into_inner();
+                        // TODO: what kind of recovery routines should be run on recovered
+                        // drawbuffers? should probably be doing this everywhere we attempt to lock
+                        // mutexes... :thinkies: mutices???
+                        Some(recovered)
+                    }
+                }
+            },
+        ) {
+            Some(g) => g,
+            None => {
+                return Err(TuiError::ExceedRetryLimitForLockingDrawBuffer(
+                    String::from("setting canvas index for drawbuffer-owned tuxel"),
+                ))
+            }
+        };
         let t = dbi.get_tuxel_mut(self.buf_idx.clone().into())?;
         t.set_idx(new_idx);
         Ok(())
