@@ -40,7 +40,7 @@ impl<T: Write> Renderer for Crossterm<T> {
     fn clear(&mut self, c: &Canvas) -> Result<()> {
         let (width, height) = c.dimensions();
         self.w
-            .queue(terminal::BeginSynchronizedUpdate)
+            .execute(terminal::BeginSynchronizedUpdate)
             .with_context(|| "queue synchronized update")?;
         self.w
             .queue(cursor::SavePosition)
@@ -59,7 +59,7 @@ impl<T: Write> Renderer for Crossterm<T> {
             .queue(cursor::RestorePosition)
             .with_context(|| "queue restore position")?;
         self.w
-            .queue(terminal::EndSynchronizedUpdate)
+            .execute(terminal::EndSynchronizedUpdate)
             .with_context(|| "queue end synchronized update")?;
         self.w.flush().with_context(|| "flush writer")?;
         Ok(())
@@ -67,11 +67,11 @@ impl<T: Write> Renderer for Crossterm<T> {
 
     fn render(&mut self, c: &Canvas) -> Result<()> {
         self.w
-            .queue(terminal::BeginSynchronizedUpdate)
-            .with_context(|| "queue synchronized update")?;
+            .execute(terminal::BeginSynchronizedUpdate)
+            .with_context(|| "execute synchronized update")?;
         self.w
-            .queue(cursor::SavePosition)
-            .with_context(|| "queue save cursor position")?;
+            .execute(cursor::SavePosition)
+            .with_context(|| "execute save cursor position")?;
         for stack in c.get_changed() {
             let (fgcolor, bgcolor) = stack.colors();
             let output = match stack.content() {
@@ -80,31 +80,30 @@ impl<T: Write> Renderer for Crossterm<T> {
             };
             let (x, y) = stack.coordinates();
             self.w
-                .queue(cursor::MoveTo(x as u16, y as u16))
-                .with_context(|| "queue moving cursor")?;
+                .execute(cursor::MoveTo(x as u16, y as u16))
+                .with_context(|| "execute moving cursor")?;
             if let Some(bg) = bgcolor {
-                self.w.queue(style::SetBackgroundColor(bg.into()))?;
+                self.w.execute(style::SetBackgroundColor(bg.into()))?;
             }
             if let Some(fg) = fgcolor {
-                self.w.queue(style::SetForegroundColor(fg.into()))?;
+                self.w.execute(style::SetForegroundColor(fg.into()))?;
             }
             self.w
-                .queue(style::Print(output))
-                .with_context(|| "queue printing cell text")?;
+                .execute(style::Print(output))
+                .with_context(|| "execute printing cell text")?;
             self.w
-                .queue(style::ResetColor)
-                .with_context(|| "queue color reset")?;
+                .execute(style::ResetColor)
+                .with_context(|| "execute color reset")?;
             self.w
-                .queue(style::SetAttribute(style::Attribute::Reset))
-                .with_context(|| "queue attribute reset")?;
+                .execute(style::SetAttribute(style::Attribute::Reset))
+                .with_context(|| "execute attribute reset")?;
         }
         self.w
-            .queue(cursor::RestorePosition)
-            .with_context(|| "queue restore position")?;
+            .execute(cursor::RestorePosition)
+            .with_context(|| "execute restore position")?;
         self.w
-            .queue(terminal::EndSynchronizedUpdate)
-            .with_context(|| "queue end synchronized update")?;
-        self.w.flush().with_context(|| "flush writer")?;
+            .execute(terminal::EndSynchronizedUpdate)
+            .with_context(|| "execute end synchronized update")?;
         Ok(())
     }
 
