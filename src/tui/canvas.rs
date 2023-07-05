@@ -129,7 +129,7 @@ impl CanvasInner {
         match &mut c1 {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
-                dbt.set_canvas_idx(&idx2);
+                dbt.set_canvas_idx(&idx2)?;
             }
             Cell::Tuxel(ref mut t) => {
                 t.set_idx(&idx2);
@@ -138,7 +138,7 @@ impl CanvasInner {
         match &mut c2 {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
-                dbt.set_canvas_idx(&idx1);
+                dbt.set_canvas_idx(&idx1)?;
             }
             Cell::Tuxel(ref mut t) => {
                 t.set_idx(&idx1);

@@ -72,7 +72,8 @@ impl Rectangle {
             Position::TopRight => (self.width() - 1, 0),
             Position::BottomLeft => (0, self.height() - 1),
             Position::BottomRight => (self.width() - 1, self.height() - 1),
-            Position::Idx(x, y) => (*x, *y),
+            Position::Coordinates(x, y) => (*x, *y),
+            Position::Idx(Idx(x, y, _z)) => (*x, *y),
         }
     }
 
@@ -161,7 +162,14 @@ pub(crate) enum Position {
     TopRight,
     BottomLeft,
     BottomRight,
-    Idx(usize, usize),
+    Coordinates(usize, usize),
+    Idx(Idx),
+}
+
+impl From<Idx> for Position {
+    fn from(idx: Idx) -> Self {
+        Self::Idx(idx)
+    }
 }
 
 /// Direction represents the direction indicated by the player.

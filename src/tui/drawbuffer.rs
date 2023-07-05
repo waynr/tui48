@@ -24,7 +24,7 @@ impl DrawBufferInner {
                 // can't write more than width of buffer
                 break;
             }
-            self.get_tuxel_mut(Position::Idx(offset + x, y))?
+            self.get_tuxel_mut(Position::Coordinates(offset + x, y))?
                 .set_content(c);
         }
         Ok(())
@@ -42,7 +42,7 @@ impl DrawBufferInner {
                 // can't write more than width of buffer
                 break;
             }
-            self.get_tuxel_mut(Position::Idx(x - offset, y))?
+            self.get_tuxel_mut(Position::Coordinates(x - offset, y))?
                 .set_content(c);
         }
         Ok(())
@@ -63,7 +63,7 @@ impl DrawBufferInner {
             .enumerate()
             .take_while(|(idx, _)| *idx < available_width)
         {
-            self.get_tuxel_mut(Position::Idx(idx + x_offset, y_offset))?
+            self.get_tuxel_mut(Position::Coordinates(idx + x_offset, y_offset))?
                 .set_content(c);
         }
         Ok(())
@@ -217,7 +217,6 @@ impl DrawBufferInner {
                         new_idx.0 -= 1
                     } //TODO: figure out how to handle the 0 case
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
-                    t.set_idx(&new_idx);
                 }
             }
             Direction::Right => {
@@ -228,7 +227,6 @@ impl DrawBufferInner {
                         new_idx.0 += 1
                     };
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
-                    t.set_idx(&new_idx);
                 }
             }
             Direction::Up => {
@@ -240,7 +238,6 @@ impl DrawBufferInner {
                     }
 
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
-                    t.set_idx(&new_idx);
                 }
             }
             Direction::Down => {
@@ -253,7 +250,6 @@ impl DrawBufferInner {
                         return Err(TuiError::DrawBufferTranslationFailed(String::from("")));
                     }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
-                    t.set_idx(&new_idx);
                 }
             }
         }
@@ -264,7 +260,7 @@ impl DrawBufferInner {
 // Tuxel-querying methods.
 impl DrawBufferInner {
     fn tuxel_is_active(&self, x: usize, y: usize) -> Result<bool> {
-        Ok(self.get_tuxel(Position::Idx(x, y))?.active())
+        Ok(self.get_tuxel(Position::Coordinates(x, y))?.active())
     }
 
     fn tuxel_colors(&self, x: usize, y: usize) -> (Option<Rgb>, Option<Rgb>) {
@@ -272,7 +268,7 @@ impl DrawBufferInner {
     }
 
     fn tuxel_content(&self, x: usize, y: usize) -> Result<char> {
-        Ok(self.get_tuxel(Position::Idx(x, y))?.content())
+        Ok(self.get_tuxel(Position::Coordinates(x, y))?.content())
     }
 }
 
@@ -302,12 +298,16 @@ impl DrawBuffer {
 
     pub(crate) fn push(&mut self, t: Tuxel) -> DBTuxel {
         let mut inner = self.lock();
-        let idx = t.idx();
-        let buf_idx = Idx(idx.0 - inner.rectangle.x(), idx.1 - inner.rectangle.y(), 0);
+        let canvas_idx = t.idx();
+        let buf_idx = Idx(
+            canvas_idx.0 - inner.rectangle.x(),
+            canvas_idx.1 - inner.rectangle.y(),
+            0,
+        );
         inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
         DBTuxel {
             parent: self.inner.clone(),
-            idx,
+            canvas_idx,
             buf_idx,
         }
     }
@@ -383,7 +383,7 @@ impl Drop for DrawBuffer {
 
 pub(crate) struct DBTuxel {
     parent: Arc<Mutex<DrawBufferInner>>,
-    idx: Idx,
+    canvas_idx: Idx,
     buf_idx: Idx,
 }
 
@@ -403,11 +403,15 @@ impl DBTuxel {
     }
 
     pub(crate) fn coordinates(&self) -> (usize, usize) {
-        (self.idx.0, self.idx.1)
+        (self.canvas_idx.0, self.canvas_idx.1)
     }
 
-    pub(crate) fn set_canvas_idx(&mut self, idx: &Idx) {
-        self.idx = idx.clone()
+    pub(crate) fn set_canvas_idx(&mut self, new_idx: &Idx) -> Result<()> {
+        self.canvas_idx = new_idx.clone();
+        let mut dbi = self.lock();
+        let t = dbi.get_tuxel_mut(self.buf_idx.clone().into())?;
+        t.set_idx(new_idx);
+        Ok(())
     }
 
     pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
