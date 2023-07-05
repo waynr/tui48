@@ -265,7 +265,7 @@ mod test {
         #[case] expected: Rectangle,
     ) -> Result<()> {
         let mut updated = initial.clone();
-        updated.translate(magnitude, direction)?;
+        updated.translate(magnitude, &direction)?;
         assert_eq!(expected, updated);
         Ok(())
     }
