@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::colors::Rgb;
 use super::drawbuffer::{DBTuxel, DrawBuffer};
-use super::error::{Result, TuiError};
-use super::geometry::{Bounds2D, Indices, Idx, Rectangle};
+use super::error::{InnerError, Result, TuiError};
+use super::geometry::{Bounds2D, Idx, Indices, Rectangle};
 use super::tuxel::Tuxel;
 
 struct CanvasInner {
@@ -34,7 +34,7 @@ impl CanvasInner {
                 let cell = cellstack.acquire(canvas_idx.z());
                 let tuxel = match cell {
                     Cell::Tuxel(t) => t,
-                    _ => return Err(TuiError::CellAlreadyOwned),
+                    _ => return Err(InnerError::CellAlreadyOwned.into()),
                 };
                 let db_tuxel = dbuf.push(tuxel);
                 cellstack.replace(canvas_idx.z(), Cell::DBTuxel(db_tuxel));
@@ -97,9 +97,9 @@ impl CanvasInner {
         Ok(self
             .grid
             .get_mut(idx.y())
-            .ok_or(TuiError::OutOfBoundsY(idx.y()))?
+            .ok_or(InnerError::OutOfBoundsY(idx.y()))?
             .get_mut(idx.x())
-            .ok_or(TuiError::OutOfBoundsX(idx.x()))?
+            .ok_or(InnerError::OutOfBoundsX(idx.x()))?
             .acquire(idx.z()))
     }
 
@@ -107,9 +107,9 @@ impl CanvasInner {
         Ok(self
             .grid
             .get_mut(idx.y())
-            .ok_or(TuiError::OutOfBoundsY(idx.y()))?
+            .ok_or(InnerError::OutOfBoundsY(idx.y()))?
             .get_mut(idx.x())
-            .ok_or(TuiError::OutOfBoundsX(idx.x()))?
+            .ok_or(InnerError::OutOfBoundsX(idx.x()))?
             .replace(idx.z(), cell))
     }
 
@@ -129,7 +129,17 @@ impl CanvasInner {
         match &mut c1 {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
-                dbt.set_canvas_idx(&idx2)?;
+                match dbt.set_canvas_idx(&idx2) {
+                    Ok(_) => (),
+                    // if we hit retry limit, assume that this change is ultimately being driven by
+                    // the DrawBuffer whose tuxels we are attempting to update and that the
+                    // DrawBuffer code will take responsibility for updating it as necessary
+                    Err(TuiError {
+                        inner: InnerError::ExceedRetryLimitForLockingDrawBuffer(_),
+                        ..
+                    }) => (),
+                    Err(e) => return Err(e),
+                }
             }
             Cell::Tuxel(ref mut t) => {
                 t.set_idx(&idx2);
@@ -138,7 +148,17 @@ impl CanvasInner {
         match &mut c2 {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
-                dbt.set_canvas_idx(&idx1)?;
+                match dbt.set_canvas_idx(&idx2) {
+                    Ok(_) => (),
+                    // if we hit retry limit, assume that this change is ultimately being driven by
+                    // the DrawBuffer whose tuxels we are attempting to update and that the
+                    // DrawBuffer code will take responsibility for updating it as necessary
+                    Err(TuiError {
+                        inner: InnerError::ExceedRetryLimitForLockingDrawBuffer(_),
+                        ..
+                    }) => (),
+                    Err(e) => return Err(e),
+                }
             }
             Cell::Tuxel(ref mut t) => {
                 t.set_idx(&idx1);
@@ -156,7 +176,7 @@ impl CanvasInner {
     fn swap_rectangles(&mut self, rect1: &Rectangle, rect2: &Rectangle) -> Result<()> {
         if rect1 == rect2 {
             // donzo!
-            return Ok(())
+            return Ok(());
         }
         //TODO: verify rect1 and rect2 can be swapped
         let rect1_indices: Indices = rect1.clone().into();

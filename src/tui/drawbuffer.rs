@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Canvas, Modifier};
 use super::colors::Rgb;
-use super::error::{Result, TuiError};
+use super::error::{Result, InnerError, TuiError};
 use super::geometry::{Direction, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
@@ -72,21 +72,23 @@ impl DrawBufferInner {
     #[inline(always)]
     fn get_tuxel_mut(&mut self, pos: Position) -> Result<&mut Tuxel> {
         let (x, y) = self.rectangle.relative_idx(&pos);
-        self.buf
+        let t = self.buf
             .get_mut(y)
-            .ok_or(TuiError::OutOfBoundsY(y))?
+            .ok_or(InnerError::OutOfBoundsY(y))?
             .get_mut(x)
-            .ok_or(TuiError::OutOfBoundsX(x))
+            .ok_or(InnerError::OutOfBoundsX(x))?;
+        Ok(t)
     }
 
     #[inline(always)]
     fn get_tuxel(&self, pos: Position) -> Result<&Tuxel> {
         let (x, y) = self.rectangle.relative_idx(&pos);
-        self.buf
+        let t = self.buf
             .get(y)
-            .ok_or(TuiError::OutOfBoundsY(y))?
+            .ok_or(InnerError::OutOfBoundsY(y))?
             .get(x)
-            .ok_or(TuiError::OutOfBoundsX(x))
+            .ok_or(InnerError::OutOfBoundsX(x))?;
+        Ok(t)
     }
 
     fn rectangle(&self) -> Rectangle {
@@ -250,7 +252,7 @@ impl DrawBufferInner {
                     if new_idx.1 < canvas_bounds.height() {
                         new_idx.1 += 1;
                     } else {
-                        return Err(TuiError::DrawBufferTranslationFailed(String::from("")));
+                        return Err(InnerError::DrawBufferTranslationFailed(String::from("")).into());
                     }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
@@ -423,7 +425,7 @@ impl DBTuxel {
         // (rather than deadlocking) simultaneous lock -- because of that we should retry a few
         // times
         let retry_count = 0usize;
-        let max_retries = 5usize;
+        let max_retries = 1usize;
         let mut dbi = match (retry_count..max_retries).into_iter().find_map(
             |i| -> Option<MutexGuard<DrawBufferInner>> {
                 match self.parent.try_lock() {
@@ -444,9 +446,9 @@ impl DBTuxel {
         ) {
             Some(g) => g,
             None => {
-                return Err(TuiError::ExceedRetryLimitForLockingDrawBuffer(
+                return Err(InnerError::ExceedRetryLimitForLockingDrawBuffer(
                     String::from("setting canvas index for drawbuffer-owned tuxel"),
-                ))
+                ).into())
             }
         };
         let t = dbi.get_tuxel_mut(self.buf_idx.clone().into())?;

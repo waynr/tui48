@@ -1,4 +1,4 @@
-use super::error::{Result, TuiError};
+use super::error::{Result, InnerError};
 
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -87,11 +87,11 @@ impl Rectangle {
             Direction::Up if self.y() <= mag => self.0 .1 = 0,
             Direction::Down => self.0 .1 += mag,
             _ => {
-                return Err(TuiError::InvalidVectorTranslation {
+                return Err(InnerError::InvalidVectorTranslation {
                     mag,
                     dir: dir.clone(),
                     rect: self.clone(),
-                })
+                }.into())
             }
         }
         Ok(())
@@ -105,10 +105,10 @@ impl Rectangle {
     #[inline(always)]
     pub(crate) fn contains_or_err(&self, idx: &Idx) -> Result<()> {
         if idx.x() < self.x() || idx.x() > self.x() + self.width() {
-            return Err(TuiError::OutOfBoundsX(idx.x()));
+            return Err(InnerError::OutOfBoundsX(idx.x()).into());
         }
         if idx.y() < self.y() || idx.y() > self.y() + self.height() {
-            return Err(TuiError::OutOfBoundsY(idx.y()));
+            return Err(InnerError::OutOfBoundsY(idx.y()).into());
         }
         Ok(())
     }
