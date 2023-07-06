@@ -10,7 +10,6 @@ use crate::engine::round::{AnimationHint, Hint, Round};
 use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
 use crate::tui::drawbuffer::DrawBuffer;
-use crate::tui::error::TuiError;
 use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
@@ -81,7 +80,7 @@ impl Tui48Board {
         let (cwidth, cheight) = canvas.dimensions();
         let (x_extent, y_extent) = board_rectangle.extents();
         if cwidth < x_extent || cheight < y_extent {
-            return Err(TuiError::TerminalTooSmall(cwidth, cheight).into());
+            return Err(Error::TerminalTooSmall(cwidth, cheight).into());
         }
 
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
@@ -599,9 +598,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         self.canvas = Canvas::new(width as usize, height as usize);
         self.tui_board = match Tui48Board::new(&self.board, &mut self.canvas) {
             Ok(tb) => Some(tb),
-            Err(Error::TuiError {
-                source: TuiError::TerminalTooSmall(_, _),
-            }) => None,
+            Err(Error::TerminalTooSmall(_, _)) => None,
             Err(e) => return Err(e),
         };
         Ok(())

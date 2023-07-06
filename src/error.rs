@@ -43,4 +43,7 @@ pub(crate) enum Error {
 
     #[error("cannot convert slot to new sliding tile slot")]
     CannotConvertToNewSlidingTileSlot,
+
+    #[error("terminal too small, required minimum size {0} x {1}")]
+    TerminalTooSmall(usize, usize),
 }
