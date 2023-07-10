@@ -104,4 +104,7 @@ pub(crate) enum InnerError {
 
     #[error("exceeded retry limit for locking drawbuffer: {0:?}")]
     ExceedRetryLimitForLockingDrawBuffer(String),
+
+    #[error("rectangle dimensions must match")]
+    RectangleDimensionsMustMatch,
 }

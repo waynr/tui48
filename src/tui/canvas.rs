@@ -175,10 +175,11 @@ impl CanvasInner {
 
     fn swap_rectangles(&mut self, rect1: &Rectangle, rect2: &Rectangle) -> Result<()> {
         if rect1 == rect2 {
-            // donzo!
             return Ok(());
+        } else if rect1.width() != rect2.width() || rect1.height() != rect2.height() {
+            return Err(InnerError::RectangleDimensionsMustMatch.into());
         }
-        //TODO: verify rect1 and rect2 can be swapped
+
         let rect1_indices: Indices = rect1.clone().into();
         let rect2_indices: Indices = rect2.clone().into();
         for (idx1, idx2) in rect1_indices.zip(rect2_indices) {
