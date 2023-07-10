@@ -16,7 +16,7 @@ impl std::fmt::Debug for TuiError {
 
 impl std::fmt::Display for TuiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{0:?}\n{1}", self.inner, self.bt)
+        write!(f, "{0}\n{1}", self.inner, self.bt)
     }
 }
 
