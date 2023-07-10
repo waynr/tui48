@@ -63,13 +63,13 @@ pub(crate) enum InnerError {
     #[error("{0}ward translation impossible")]
     TranslationImpossible(super::geometry::Direction),
 
-    #[error("out of bounds x - {0}")]
+    #[error("out of bounds x: {0}")]
     OutOfBoundsX(usize),
 
-    #[error("out of bounds y - {0}")]
+    #[error("out of bounds y: {0}")]
     OutOfBoundsY(usize),
 
-    #[error("out of bounds z - {0}")]
+    #[error("out of bounds z: {0}")]
     OutOfBoundsZ(usize),
 
     #[error("idx channel send failed")]
