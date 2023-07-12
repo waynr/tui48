@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Canvas, Modifier};
 use super::colors::Rgb;
-use super::error::{Result, InnerError, TuiError};
+use super::error::{InnerError, Result, TuiError};
 use super::geometry::{Direction, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
@@ -13,6 +13,12 @@ pub(crate) struct DrawBufferInner {
     pub(crate) buf: Vec<Vec<Tuxel>>,
     pub(crate) modifiers: Vec<Modifier>,
     pub(crate) canvas: Canvas,
+}
+
+impl std::fmt::Display for DrawBufferInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{0}", self.rectangle)
+    }
 }
 
 impl DrawBufferInner {
@@ -83,7 +89,8 @@ impl DrawBufferInner {
     #[inline(always)]
     fn get_tuxel(&self, pos: Position) -> Result<&Tuxel> {
         let (x, y) = self.rectangle.relative_idx(&pos);
-        let t = self.buf
+        let t = self
+            .buf
             .get(y)
             .ok_or(InnerError::OutOfBoundsY(y))?
             .get(x)

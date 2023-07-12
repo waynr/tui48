@@ -1,8 +1,14 @@
-use super::error::{Result, InnerError};
+use super::error::{InnerError, Result};
 
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Idx(pub usize, pub usize, pub usize);
+
+impl std::fmt::Display for Idx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "idx({0},{1},{2})", self.0, self.1, self.2)
+    }
+}
 
 impl Idx {
     #[inline(always)]
@@ -24,6 +30,12 @@ impl Idx {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Bounds2D(pub usize, pub usize);
 
+impl std::fmt::Display for Bounds2D {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "dims({0}, {1})", self.0, self.1)
+    }
+}
+
 impl Bounds2D {
     #[inline(always)]
     pub(crate) fn width(&self) -> usize {
@@ -38,6 +50,12 @@ impl Bounds2D {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Rectangle(pub Idx, pub Bounds2D);
+
+impl std::fmt::Display for Rectangle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "rect({0} {1})", self.0, self.1,)
+    }
+}
 
 impl Rectangle {
     #[inline(always)]
@@ -91,7 +109,8 @@ impl Rectangle {
                     mag,
                     dir: dir.clone(),
                     rect: self.clone(),
-                }.into())
+                }
+                .into())
             }
         }
         Ok(())

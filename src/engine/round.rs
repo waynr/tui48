@@ -8,6 +8,12 @@ use crate::tui::geometry::Direction;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
+impl std::fmt::Display for Idx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ridx({0},{1})", self.0, self.1)
+    }
+}
+
 impl Idx {
     pub(crate) fn x(&self) -> usize {
         self.0
@@ -25,10 +31,32 @@ pub(crate) enum Hint {
     NewTile(u16, Direction),
 }
 
+impl std::fmt::Display for Hint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ToIdx(idx) => write!(f, "Hint::ToIdx({0})", idx),
+            Self::NewValueToIdx(value, idx) => write!(f, "Hint::NewValueToIdx({0}, {1})", value, idx),
+            Self::NewTile(value, direction) => write!(f, "Hint::NewTile({0}, {1})", value, direction),
+        }
+    }
+}
+
 #[derive(Default, PartialEq)]
 pub(crate) struct AnimationHint {
     hint: Vec<(Idx, Hint)>,
     changed: bool,
+}
+
+impl std::fmt::Display for AnimationHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.hint.len() > 0  {
+            write!(f, "\n")?;
+        }
+        for (idx, hint) in &self.hint {
+            write!(f, "  {0} - {1}\n", idx, hint)?;
+        }
+        Ok(())
+    }
 }
 
 impl AnimationHint {

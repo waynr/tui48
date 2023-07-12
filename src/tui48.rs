@@ -278,6 +278,65 @@ impl Tui48Board {
     }
 }
 
+impl std::fmt::Display for Tui48Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for (y, row) in self.slots.iter().enumerate() {
+            for _ in row.iter() {
+                write!(f, "{:=^15}", "")?;
+            }
+            write!(f, "\n")?;
+            for (x, slot) in row.iter().enumerate() {
+                let slot = match slot {
+                    Slot::Empty => self.moving_slots.iter().find(|s| match s {
+                        Slot::Sliding(st) => st.inner.idx.x() == x && st.inner.idx.y() == y,
+                        _ => false,
+                    }),
+                    _ => Some(slot),
+                };
+                if let Some(s) = slot {
+                    if let Some(v) = s.value() {
+                        write!(f, "{:^15}", format!("    val: {}", v))?;
+                    } else {
+                        write!(f, "{:^15}", "")?;
+                    }
+                    if let Some(bidx) = s.board_index() {
+                        write!(f, "{:^15}", format!("   bidx: {}", bidx))?;
+                    } else {
+                        write!(f, "{:^15}", "")?;
+                    }
+                    if let Some(r) = s.rectangle() {
+                        write!(f, "{:^15}", format!("   cidx: {}", r.0))?;
+                    } else {
+                        write!(f, "{:^15}", "")?;
+                    }
+                    if let Some(v) = s.new_value() {
+                        write!(f, "{:^15}", format!("new_val: {}", v))?;
+                    } else {
+                        write!(f, "{:^15}", "")?;
+                    }
+                    if let Some(r) = s.to_rectangle() {
+                        write!(f, "{:^15}", format!("to_rect: {}", r))?;
+                    } else {
+                        write!(f, "{:^15}", "")?;
+                    }
+                } else {
+                    write!(f, "{:^15}", "")?;
+                    write!(f, "{:^15}", "")?;
+                    write!(f, "{:^15}", "empty")?;
+                    write!(f, "{:^15}", "")?;
+                    write!(f, "{:^15}", "")?;
+                }
+            }
+            write!(f, "\n")?;
+            for _ in row.iter() {
+                write!(f, "{:.^15}", "")?;
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
+
 impl From<&BoardIdx> for Idx {
     fn from(board_idx: &BoardIdx) -> Idx {
         Idx(board_idx.0, board_idx.1, 0)
@@ -290,6 +349,17 @@ enum Slot {
     Empty,
     Static(Tile),
     Sliding(SlidingTile),
+}
+
+impl std::fmt::Display for Slot {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Empty => f.pad("empty")?,
+            Self::Static(t) => write!(f, "{}", t)?,
+            Self::Sliding(st) => write!(f, "{}", st)?,
+        };
+        Ok(())
+    }
 }
 
 impl Slot {
@@ -359,10 +429,65 @@ impl Slot {
     }
 }
 
+impl Slot {
+    fn value(&self) -> Option<u16> {
+        match self {
+            Self::Empty => None,
+            Self::Static(t) => Some(t.value()),
+            Self::Sliding(st) => Some(st.value()),
+        }
+    }
+
+    fn new_value(&self) -> Option<u16> {
+        match self {
+            Self::Empty => None,
+            Self::Static(t) => None,
+            Self::Sliding(st) => st.new_value(),
+        }
+    }
+
+    fn board_index(&self) -> Option<BoardIdx> {
+        match self {
+            Self::Empty => None,
+            Self::Static(t) => Some(t.board_index()),
+            Self::Sliding(st) => Some(st.board_index()),
+        }
+    }
+
+    fn rectangle(&self) -> Option<Rectangle> {
+        match self {
+            Self::Empty => None,
+            Self::Static(t) => Some(t.rectangle()),
+            Self::Sliding(st) => Some(st.rectangle()),
+        }
+    }
+
+    fn to_rectangle(&self) -> Option<Rectangle> {
+        match self {
+            Self::Empty => None,
+            Self::Static(t) => None,
+            Self::Sliding(st) => Some(st.to_rectangle()),
+        }
+    }
+}
+
 struct Tile {
     value: u16,
     idx: BoardIdx,
     buf: DrawBuffer,
+}
+
+impl std::fmt::Display for Tile {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "T({},{},{})",
+            self.value,
+            self.idx,
+            self.buf.rectangle().0
+        );
+        Ok(())
+    }
 }
 
 impl Tile {
@@ -373,6 +498,18 @@ impl Tile {
     fn draw(&mut self) -> Result<()> {
         Tui48Board::draw_tile(&mut self.buf, self.value)
     }
+
+    fn value(&self) -> u16 {
+        self.value
+    }
+
+    fn board_index(&self) -> BoardIdx {
+        self.idx.clone()
+    }
+
+    fn rectangle(&self) -> Rectangle {
+        self.buf.rectangle()
+    }
 }
 
 struct SlidingTile {
@@ -380,6 +517,16 @@ struct SlidingTile {
     to_rectangle: Rectangle,
     is_animating: bool,
     new_value: Option<u16>,
+}
+
+impl std::fmt::Display for SlidingTile {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if let Some(v) = self.new_value {
+            write!(f, "ST({}->({},{}))", self.inner, self.to_rectangle.0, v,)
+        } else {
+            write!(f, "ST({}->({},N/A))", self.inner, self.to_rectangle.0,)
+        }
+    }
 }
 
 impl SlidingTile {
@@ -462,6 +609,28 @@ impl SlidingTile {
             }
             _ => Ok(true),
         }
+    }
+}
+
+impl SlidingTile {
+    fn value(&self) -> u16 {
+        self.inner.value
+    }
+
+    fn new_value(&self) -> Option<u16> {
+        self.new_value
+    }
+
+    fn board_index(&self) -> BoardIdx {
+        self.inner.idx.clone()
+    }
+
+    fn to_rectangle(&self) -> Rectangle {
+        self.to_rectangle.clone()
+    }
+
+    fn rectangle(&self) -> Rectangle {
+        self.inner.buf.rectangle()
     }
 }
 
