@@ -114,6 +114,7 @@ impl CanvasInner {
     }
 
     fn swap_tuxels(&mut self, idx1: Idx, idx2: Idx) -> Result<()> {
+        log::trace!("swapping {0} and {1}", idx1, idx2);
         self.rectangle.contains_or_err(&idx1)?;
         self.rectangle.contains_or_err(&idx2)?;
         let mut c1 = self.acquire_cell(&idx1)?;
@@ -182,6 +183,7 @@ impl CanvasInner {
 
         let rect1_indices: Indices = rect1.clone().into();
         let rect2_indices: Indices = rect2.clone().into();
+        log::trace!("swapping {0} and {1}", rect1, rect2);
         for (idx1, idx2) in rect1_indices.zip(rect2_indices) {
             self.swap_tuxels(idx1, idx2)?
         }

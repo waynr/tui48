@@ -223,6 +223,7 @@ impl Tui48Board {
     }
 
     fn setup_animation(&mut self, hints: AnimationHint) -> Result<()> {
+        log::trace!("setting up animation with hints:\n{0}", hints);
         for (idx, hint) in hints.hints() {
             let slot = self.get_slot(&idx)?;
             let new_slot = match hint {
@@ -239,6 +240,7 @@ impl Tui48Board {
     }
 
     fn teardown_animation(&mut self) -> Result<()> {
+        log::trace!("tearing down animation");
         for slot in self
             .done_slots
             .drain(0..)
@@ -740,7 +742,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             };
 
             self.renderer.render(&self.canvas)?;
-
+            log::trace!("rendered, waiting for input");
             match self.event_source.next_event()? {
                 Event::UserInput(UserInput::Direction(d)) => self.shift(d)?,
                 Event::UserInput(UserInput::Quit) => break,
@@ -784,10 +786,17 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     .tui_board
                     .take()
                     .expect("why wouldn't we have a tui board at this point?");
+                log::trace!("prior to setting up animation\n{}", tui_board);
                 tui_board.setup_animation(hint)?;
+                log::trace!("after setting up animation\n{}", tui_board);
+                let mut fc = 0;
                 while tui_board.animate()? {
+                    log::trace!("generated animation frame {0}\n{1}", fc, tui_board);
                     std::thread::sleep(std::time::Duration::from_millis(1));
                     self.renderer.render(&self.canvas)?;
+                    log::trace!("rendered frame {} after sleeping 1ms", fc);
+
+                    fc += 1;
                 }
                 tui_board.teardown_animation()?;
                 self.renderer.render(&self.canvas)?;

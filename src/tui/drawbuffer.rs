@@ -77,8 +77,11 @@ impl DrawBufferInner {
 
     #[inline(always)]
     fn get_tuxel_mut(&mut self, pos: Position) -> Result<&mut Tuxel> {
+
         let (x, y) = self.rectangle.relative_idx(&pos);
-        let t = self.buf
+        log::trace!("get_tuxel_mut: {0}, {1}", x, y);
+        let t = self
+            .buf
             .get_mut(y)
             .ok_or(InnerError::OutOfBoundsY(y))?
             .get_mut(x)
@@ -200,6 +203,7 @@ impl DrawBufferInner {
             // shh, don't tell the caller that we didn't have to do anything
             return Ok(());
         }
+        log::trace!("switching layer from {0} to {1}", self.rectangle.z(), zdx);
 
         let old = self.rectangle.clone();
         self.rectangle.0 .2 = zdx;
@@ -259,7 +263,9 @@ impl DrawBufferInner {
                     if new_idx.1 < canvas_bounds.height() {
                         new_idx.1 += 1;
                     } else {
-                        return Err(InnerError::DrawBufferTranslationFailed(String::from("")).into());
+                        return Err(
+                            InnerError::DrawBufferTranslationFailed(String::from("")).into()
+                        );
                     }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
@@ -440,7 +446,7 @@ impl DBTuxel {
                     Err(std::sync::TryLockError::WouldBlock) => {
                         std::thread::sleep(std::time::Duration::from_millis(i as u64 * 5));
                         None
-                    },
+                    }
                     Err(std::sync::TryLockError::Poisoned(p_err)) => {
                         let recovered = p_err.into_inner();
                         // TODO: what kind of recovery routines should be run on recovered
@@ -453,9 +459,12 @@ impl DBTuxel {
         ) {
             Some(g) => g,
             None => {
-                return Err(InnerError::ExceedRetryLimitForLockingDrawBuffer(
-                    String::from("setting canvas index for drawbuffer-owned tuxel"),
-                ).into())
+                return Err(
+                    InnerError::ExceedRetryLimitForLockingDrawBuffer(String::from(
+                        "setting canvas index for drawbuffer-owned tuxel",
+                    ))
+                    .into(),
+                )
             }
         };
         let t = dbi.get_tuxel_mut(self.buf_idx.clone().into())?;
