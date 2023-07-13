@@ -1,19 +1,20 @@
-use rand::rngs::ThreadRng;
+use rand::RngCore;
 
 use super::round::{AnimationHint, Round, Score};
 use crate::tui::geometry::Direction;
+
 /// Board represents a 2048 board that keeps track of the history of its game states.
 pub(crate) struct Board {
-    rng: ThreadRng,
+    rng: Box<dyn RngCore>,
     rounds: Vec<Round>,
 }
 
 impl Board {
     /// Initialize new board using the given random number generator.
-    pub(crate) fn new(mut rng: ThreadRng) -> Self {
+    pub(crate) fn new(mut rng: impl RngCore + 'static) -> Self {
         let mut rounds = Vec::with_capacity(2000);
         rounds.push(Round::random(&mut rng));
-        Self { rng, rounds }
+        Self { rng: Box::new(rng), rounds }
     }
 
     pub(crate) fn score(&self) -> Score {
