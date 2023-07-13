@@ -17,7 +17,10 @@ pub(crate) struct DrawBufferInner {
 
 impl std::fmt::Display for DrawBufferInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{0}", self.rectangle)
+        for row in self.buf.iter() {
+            write!(f, "{}\n", row.iter().map(|t| t.content()).collect::<String>())?
+        }
+        Ok(())
     }
 }
 
@@ -294,6 +297,12 @@ impl DrawBufferInner {
 pub(crate) struct DrawBuffer {
     inner: Arc<Mutex<DrawBufferInner>>,
     sender: Sender<Tuxel>,
+}
+
+impl std::fmt::Display for DrawBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.lock().fmt(f)
+    }
 }
 
 impl DrawBuffer {

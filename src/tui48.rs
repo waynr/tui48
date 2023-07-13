@@ -225,8 +225,9 @@ impl Tui48Board {
     fn setup_animation(&mut self, hints: AnimationHint) -> Result<()> {
         log::trace!("setting up animation with hints:\n{0}", hints);
         for (idx, hint) in hints.hints() {
+            log::trace!("setting up animation for hint: {0}", hint);
             let slot = self.get_slot(&idx)?;
-            let new_slot = match hint {
+            let new_slot = match hint.clone() {
                 Hint::ToIdx(to_idx) => Slot::to_sliding(slot, to_idx, None)?,
                 Hint::NewValueToIdx(value, to_idx) => Slot::to_sliding(slot, to_idx, Some(value))?,
                 Hint::NewTile(value, slide_direction) => {
@@ -235,6 +236,7 @@ impl Tui48Board {
                 }
             };
             self.moving_slots.push(new_slot);
+            log::trace!("after with hint {0}:\n{1}", hint, self);
         }
         Ok(())
     }
@@ -283,56 +285,102 @@ impl Tui48Board {
 impl std::fmt::Display for Tui48Board {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for (y, row) in self.slots.iter().enumerate() {
-            for _ in row.iter() {
-                write!(f, "{:=^15}", "")?;
+            write!(f, "{:=^23}", "")?;
+            write!(f, "{:=^23}", "")?;
+            write!(f, "{:=^23}", "")?;
+            write!(f, "{:=^23}", "")?;
+            write!(f, "\n")?;
+
+            let lines: Vec<[String; 5]> = row
+                .iter()
+                .enumerate()
+                .map(|(x, slot)| {
+                    let slot = match slot {
+                        Slot::Empty => self.moving_slots.iter().find(|s| match s {
+                            Slot::Sliding(st) => st.inner.idx.x() == x && st.inner.idx.y() == y,
+                            _ => false,
+                        }),
+                        _ => Some(slot),
+                    };
+                    if let Some(s) = slot {
+                        [
+                            if let Some(v) = s.value() {
+                                format!("{}", v)
+                            } else {
+                                String::new()
+                            },
+                            if let Some(bidx) = s.board_index() {
+                                format!("{}", bidx)
+                            } else {
+                                String::new()
+                            },
+                            if let Some(r) = s.rectangle() {
+                                format!("{}", r.0)
+                            } else {
+                                String::new()
+                            },
+                            if let Some(v) = s.new_value() {
+                                format!("{}", v)
+                            } else {
+                                String::new()
+                            },
+                            if let Some(r) = s.to_rectangle() {
+                                format!("{}", r.0)
+                            } else {
+                                String::new()
+                            },
+                        ]
+                    } else {
+                        [
+                            String::new(),
+                            String::new(),
+                            String::new(),
+                            String::new(),
+                            String::new(),
+                        ]
+                    }
+                })
+                .collect();
+            let vals = lines.iter().map(|s| &s[0]);
+            let bidxs = lines.iter().map(|s| &s[1]);
+            let cidxs = lines.iter().map(|s| &s[2]);
+            let new_vals = lines.iter().map(|s| &s[3]);
+            let to_cidxs = lines.iter().map(|s| &s[4]);
+
+            for s in vals {
+                write!(f, "{: <7}:", "val")?;
+                write!(f, "{: >14}|", s)?;
             }
             write!(f, "\n")?;
-            for (x, slot) in row.iter().enumerate() {
-                let slot = match slot {
-                    Slot::Empty => self.moving_slots.iter().find(|s| match s {
-                        Slot::Sliding(st) => st.inner.idx.x() == x && st.inner.idx.y() == y,
-                        _ => false,
-                    }),
-                    _ => Some(slot),
-                };
-                if let Some(s) = slot {
-                    if let Some(v) = s.value() {
-                        write!(f, "{:^15}", format!("    val: {}", v))?;
-                    } else {
-                        write!(f, "{:^15}", "")?;
-                    }
-                    if let Some(bidx) = s.board_index() {
-                        write!(f, "{:^15}", format!("   bidx: {}", bidx))?;
-                    } else {
-                        write!(f, "{:^15}", "")?;
-                    }
-                    if let Some(r) = s.rectangle() {
-                        write!(f, "{:^15}", format!("   cidx: {}", r.0))?;
-                    } else {
-                        write!(f, "{:^15}", "")?;
-                    }
-                    if let Some(v) = s.new_value() {
-                        write!(f, "{:^15}", format!("new_val: {}", v))?;
-                    } else {
-                        write!(f, "{:^15}", "")?;
-                    }
-                    if let Some(r) = s.to_rectangle() {
-                        write!(f, "{:^15}", format!("to_rect: {}", r))?;
-                    } else {
-                        write!(f, "{:^15}", "")?;
-                    }
-                } else {
-                    write!(f, "{:^15}", "")?;
-                    write!(f, "{:^15}", "")?;
-                    write!(f, "{:^15}", "empty")?;
-                    write!(f, "{:^15}", "")?;
-                    write!(f, "{:^15}", "")?;
-                }
+
+            for s in bidxs {
+                write!(f, "{: <7}:", "bidx")?;
+                write!(f, "{: >14}|", s)?;
             }
             write!(f, "\n")?;
-            for _ in row.iter() {
-                write!(f, "{:.^15}", "")?;
+
+            for s in cidxs {
+                write!(f, "{: <7}:", "cidx")?;
+                write!(f, "{: >14}|", s)?;
             }
+            write!(f, "\n")?;
+
+            for s in new_vals {
+                write!(f, "{: <7}:", "newval")?;
+                write!(f, "{: >14}|", s)?;
+            }
+            write!(f, "\n")?;
+
+            for s in to_cidxs {
+                write!(f, "{: <7}:", "to_cidx")?;
+                write!(f, "{: >14}|", s)?;
+            }
+            write!(f, "\n")?;
+
+            write!(f, "{:.^23}", "")?;
+            write!(f, "{:.^23}", "")?;
+            write!(f, "{:.^23}", "")?;
+            write!(f, "{:.^23}", "")?;
             write!(f, "\n")?;
         }
         Ok(())
@@ -385,6 +433,7 @@ impl Slot {
             }
         };
 
+        log::trace!("about move buffer to layer {0}\n{1}", UPPER_ANIMATION_LAYER_IDX, t.buf);
         t.buf.switch_layer(UPPER_ANIMATION_LAYER_IDX)?;
         t.idx = to_idx.clone();
         if let Some(v) = new_value {
