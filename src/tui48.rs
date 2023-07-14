@@ -603,7 +603,8 @@ impl SlidingTile {
             && self.inner.buf.rectangle().0.y() == self.to_rectangle.0.y()
         {
             // final frame
-            self.inner.buf.switch_layer(TILE_LAYER_IDX)?;
+            // don't move the drawbuffer to the tile layer, leave that for
+            // Tui48Board.teardown_animation
             if let Some(v) = self.new_value {
                 self.inner.value = v;
             }
