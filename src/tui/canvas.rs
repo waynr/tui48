@@ -632,7 +632,7 @@ mod test {
         for idx in idxs.iter() {
             let inner = canvas.lock();
             let cell = &inner.grid[idx.1][idx.0].lock().cells[idx.2];
-            assert!(is_dbtuxel(cell));
+            assert!(is_tuxel(cell));
         }
 
         canvas.lock().reclaim();
