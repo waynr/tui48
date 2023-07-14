@@ -484,7 +484,6 @@ impl Slot {
     }
 
     fn idx(&self) -> Result<BoardIdx> {
-        //BoardIdx::default()
         match self {
             Slot::Empty => unreachable!(),
             Slot::Static(t) => Ok(t.idx.clone()),
