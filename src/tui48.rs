@@ -693,6 +693,10 @@ struct Colors {
 static DEFAULT_COLORS: OnceLock<Colors> = OnceLock::new();
 
 pub(crate) fn init() -> Result<()> {
+    if let Some(p) = DEFAULT_COLORS.get() {
+        // already set, no need to do anything else
+        return Ok(());
+    }
     let bg_hue = 28.0;
     let fg_hue = bg_hue + 180.0;
     let defaults = Colors {
@@ -724,9 +728,8 @@ pub(crate) fn init() -> Result<()> {
                 }),
         ),
     };
-    DEFAULT_COLORS
-        .set(defaults)
-        .or(Err(Error::DefaultColorsAlreadySet))?;
+    let _ = DEFAULT_COLORS.set(defaults);
+
     Ok(())
 }
 

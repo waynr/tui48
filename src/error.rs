@@ -26,9 +26,6 @@ pub(crate) enum Error {
         source: crate::tui::error::TuiError,
     },
 
-    #[error("default colors already set")]
-    DefaultColorsAlreadySet,
-
     #[error("unable to retrieve drawbuffer: {context:?}")]
     UnableToRetrieveSlot { context: String },
 
