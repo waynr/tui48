@@ -617,8 +617,7 @@ impl std::fmt::Display for Tile {
             self.value,
             self.idx,
             self.buf.rectangle().0
-        );
-        Ok(())
+        )
     }
 }
 
