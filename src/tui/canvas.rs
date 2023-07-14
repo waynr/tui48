@@ -116,24 +116,24 @@ impl CanvasInner {
             .replace(idx.z(), cell))
     }
 
-    fn swap_tuxels(&mut self, idx1: Idx, idx2: Idx) -> Result<()> {
-        log::trace!("swapping {0} and {1}", idx1, idx2);
-        self.rectangle.contains_or_err(Geometry::Idx(&idx1))?;
-        self.rectangle.contains_or_err(Geometry::Idx(&idx2))?;
-        let mut c1 = self.acquire_cell(&idx1)?;
-        let mut c2 = match self.acquire_cell(&idx2) {
+    fn swap_tuxels(&mut self, from_idx: Idx, to_idx: Idx) -> Result<()> {
+        log::trace!("swapping {0} and {1}", from_idx, to_idx);
+        self.rectangle.contains_or_err(Geometry::Idx(&from_idx))?;
+        self.rectangle.contains_or_err(Geometry::Idx(&to_idx))?;
+        let mut from_cell = self.acquire_cell(&from_idx)?;
+        let mut to_cell = match self.acquire_cell(&to_idx) {
             Err(e) => {
-                // if we fail to get c2 we need to return c1
-                self.replace_cell(&idx1, c1)?;
+                // if we fail to get to_cell we need to return from_cell
+                self.replace_cell(&from_idx, from_cell)?;
                 return Err(e);
             }
             Ok(c) => c,
         };
 
-        match &mut c1 {
+        match &mut from_cell {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
-                match dbt.set_canvas_idx(&idx2) {
+                match dbt.set_canvas_idx(&to_idx) {
                     Ok(_) => (),
                     // if we hit retry limit, assume that this change is ultimately being driven by
                     // the DrawBuffer whose tuxels we are attempting to update and that the
@@ -146,13 +146,13 @@ impl CanvasInner {
                 }
             }
             Cell::Tuxel(ref mut t) => {
-                t.set_idx(&idx2);
+                t.set_idx(&to_idx);
             }
         }
-        match &mut c2 {
+        match &mut to_cell {
             Cell::Empty => (),
             Cell::DBTuxel(ref mut dbt) => {
-                match dbt.set_canvas_idx(&idx2) {
+                match dbt.set_canvas_idx(&from_idx) {
                     Ok(_) => (),
                     // if we hit retry limit, assume that this change is ultimately being driven by
                     // the DrawBuffer whose tuxels we are attempting to update and that the
@@ -165,14 +165,14 @@ impl CanvasInner {
                 }
             }
             Cell::Tuxel(ref mut t) => {
-                t.set_idx(&idx1);
+                t.set_idx(&from_idx);
             }
         }
 
-        self.replace_cell(&idx1, c2)?;
-        self.replace_cell(&idx2, c1)?;
-        self.idx_sender.send(idx1)?;
-        self.idx_sender.send(idx2)?;
+        self.replace_cell(&from_idx, to_cell)?;
+        self.replace_cell(&to_idx, from_cell)?;
+        self.idx_sender.send(from_idx)?;
+        self.idx_sender.send(to_idx)?;
 
         Ok(())
     }
@@ -198,7 +198,7 @@ impl CanvasInner {
         for row in self.grid.iter() {
             for stack in row.iter() {
                 if stack.layer_occupied(zdx) {
-                    return true
+                    return true;
                 }
             }
         }
@@ -210,7 +210,7 @@ impl std::fmt::Display for CanvasInner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for i in 0..CANVAS_DEPTH {
             if !self.layer_occupied(i) {
-                continue
+                continue;
             }
             write!(f, "canvas layer {}:\n", i)?;
             for row in self.grid.iter() {
