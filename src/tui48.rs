@@ -321,12 +321,12 @@ impl Tui48Board {
                 let s1 = slot1.take();
                 let _ = slot2.take();
                 s1
-            },
+            }
             (None, Some(_)) => {
                 let s2 = slot2.take();
                 let _ = slot1.take();
                 s2
-            },
+            }
             // i don't think this branch is very likely or even possible, but just in case it is I
             // am adding a warning statement for the logs since this safe-ish approach to handling
             // it might otherwise let it go unnoticed
@@ -945,6 +945,8 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
 mod test {
     use std::collections::HashMap;
 
+    use env_logger;
+    use log::Log;
     use rand::SeedableRng;
     use rstest::*;
 
@@ -991,9 +993,20 @@ mod test {
         }
     }
 
+    fn debug(args: core::fmt::Arguments) -> log::Record {
+        log::Record::builder()
+            .level(log::Level::Debug)
+            .args(args)
+            .build()
+    }
+
     #[test]
     fn test_slide() -> Result<()> {
         init()?;
+
+        let logger = env_logger::Logger::from_default_env();
+        logger.log(&debug(format_args!("meow42")));
+
         let idxs = HashMap::from([(BoardIdx(0, 0), 2), (BoardIdx(0, 1), 2)]);
         let (mut game_board, canvas, mut tui_board) = setup(100, 100, idxs)?;
 
@@ -1015,18 +1028,53 @@ mod test {
         assert!(matches!(hint3, Hint::NewTile(2, Direction::Down)));
 
         verify_occupied_layers(&canvas, vec![2, 4], vec![0, 1, 3, 5, 6, 7]);
-
         tui_board.setup_animation(hint)?;
+        verify_occupied_layers(&canvas, vec![2, 3, 5], vec![0, 1, 4, 6, 7]);
 
         // TODO: verify board after setup
-        verify_occupied_layers(&canvas, vec![2, 3, 5], vec![0, 1, 4, 6, 7]);
+        assert_eq!(tui_board.moving_slots.len(), 3);
+        assert_eq!(tui_board.done_slots.len(), 0);
+        assert_eq!(tui_board.disappearing_slots.len(), 0);
 
         while tui_board.animate()? {
             // TODO: verify intermediate states after every animation frame
             verify_occupied_layers(&canvas, vec![2, 3, 5], vec![0, 1, 4, 6, 7]);
+            logger.log(&debug(format_args!(
+                "moving slot count: {}",
+                tui_board.moving_slots.len()
+            )));
+            logger.log(&debug(format_args!(
+                "active moving slot count: {}",
+                tui_board
+                    .moving_slots
+                    .iter()
+                    .map(|s| match s {
+                        Slot::Empty => 0,
+                        _ => 1,
+                    })
+                    .sum::<u16>()
+            )));
+            logger.log(&debug(format_args!(
+                "non-empty done slot count: {}",
+                tui_board
+                    .done_slots
+                    .iter()
+                    .map(|(_, s)| match s {
+                        Slot::Empty => 0,
+                        _ => 1,
+                    })
+                    .sum::<u16>()
+            )));
+            logger.log(&debug(format_args!(
+                "done_slot count  : {}",
+                tui_board.done_slots.len()
+            )));
         }
 
         tui_board.teardown_animation()?;
+        assert_eq!(tui_board.moving_slots.len(), 0);
+        assert_eq!(tui_board.done_slots.len(), 0);
+        assert_eq!(tui_board.disappearing_slots.len(), 0);
         verify_occupied_layers(&canvas, vec![2, 4], vec![0, 1, 3, 5, 6, 7]);
         // TODO: verify canvas after teardown
 
