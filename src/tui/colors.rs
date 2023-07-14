@@ -1,6 +1,6 @@
 use palette::rgb::Rgb as PaletteRgb;
 use palette::stimulus::FromStimulus;
-use palette::{Lighten, LightenAssign};
+use palette::LightenAssign;
 
 #[derive(Clone, Default)]
 pub(crate) struct Rgb {
@@ -45,21 +45,6 @@ impl Rgb {
 
         let mut new_color = self.clone();
         new_color.color.lighten_assign(lightness);
-        new_color
-    }
-
-    #[inline(always)]
-    pub(crate) fn adjust_lightness(&self, adjustment: f32) -> Rgb {
-        let adjustment = if adjustment > 1.0 {
-            1.0
-        } else if adjustment < -1.0 {
-            -1.0
-        } else {
-            adjustment
-        };
-
-        let mut new_color = self.clone();
-        new_color.color = new_color.color.lighten(adjustment);
         new_color
     }
 }

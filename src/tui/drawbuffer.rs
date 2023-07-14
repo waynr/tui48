@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::canvas::{Canvas, Modifier};
 use super::colors::Rgb;
-use super::error::{InnerError, Result, TuiError};
+use super::error::{InnerError, Result};
 use super::geometry::{Direction, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
@@ -393,15 +393,6 @@ impl DrawBuffer {
     pub(crate) fn rectangle(&self) -> Rectangle {
         self.lock().rectangle()
     }
-
-    pub(crate) fn clone_to(&self, layer: usize) -> Result<Self> {
-        let inner = self.lock();
-        let mut rectangle = inner.rectangle.clone();
-        rectangle.0 .2 = layer;
-        let new_dbuf = inner.canvas.get_draw_buffer(rectangle)?;
-        drop(inner);
-        Ok(new_dbuf)
-    }
 }
 
 impl<'a> DrawBuffer {
@@ -518,25 +509,10 @@ mod test {
     use super::*;
     use rstest::*;
 
-    use super::super::error::TuiError;
     use super::super::geometry::Bounds2D;
 
     fn rectangle(x: usize, y: usize, z: usize, width: usize, height: usize) -> Rectangle {
         Rectangle(Idx(x, y, z), Bounds2D(width, height))
-    }
-
-    fn tuxel_buf_from_rectangle(rect: &Rectangle) -> Vec<Vec<Tuxel>> {
-        let mut tuxels: Vec<Vec<Tuxel>> = Vec::new();
-        for y in 0..rect.height() {
-            let mut row: Vec<Tuxel> = Vec::new();
-            for x in 0..rect.width() {
-                let t = Tuxel::new(Idx(x, y, 0));
-                row.push(t);
-            }
-            tuxels.push(row);
-        }
-
-        tuxels
     }
 
     fn verify_messages_sent(receiver: &Receiver<Tuxel>, expected: usize) {
@@ -593,7 +569,7 @@ mod test {
     #[case::one_layer_up(rectangle(0, 0, 1, 5, 5), 2)]
     fn drawbuffer_switch_layer(#[case] rect: Rectangle, #[case] target_layer: usize) -> Result<()> {
         let canvas = Canvas::new(rect.width() * 2, rect.height() * 2);
-        let mut dbuf = canvas.get_draw_buffer(rect.clone())?;
+        let dbuf = canvas.get_draw_buffer(rect.clone())?;
         for _ in 0..10 {
             dbuf.switch_layer(target_layer)?;
             dbuf.switch_layer(rect.0 .2)?;

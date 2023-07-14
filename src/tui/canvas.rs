@@ -451,8 +451,8 @@ impl Stack {
     fn display_cell_type(&self, zdx: usize) -> &str {
         match &self.lock().cells[zdx] {
             Cell::Empty => "E",
-            Cell::Tuxel(t) => "T",
-            Cell::DBTuxel(t) => "D",
+            Cell::Tuxel(_) => "T",
+            Cell::DBTuxel(_) => "D",
         }
     }
 }
@@ -467,8 +467,6 @@ impl Stack {
     }
 
     pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
-        let fg = Rgb::default();
-        let bg = Rgb::default();
         if let Some(idx) = self.top() {
             self.lock()
                 .cells
@@ -500,8 +498,6 @@ pub(crate) enum Modifier {
     SetBackgroundColor(u8, u8, u8),
     SetBGLightness(f32),
     SetFGLightness(f32),
-    AdjustLightnessBG(f32),
-    AdjustLightnessFG(f32),
 }
 
 impl Modifier {
@@ -521,12 +517,6 @@ impl Modifier {
             }
             (fgcolor, Some(bgcolor), Modifier::SetBGLightness(l)) => {
                 (fgcolor, Some(bgcolor.set_lightness(*l)))
-            }
-            (Some(fgcolor), bgcolor, Modifier::AdjustLightnessFG(l)) => {
-                (Some(fgcolor.adjust_lightness(*l)), bgcolor)
-            }
-            (fgcolor, Some(bgcolor), Modifier::AdjustLightnessBG(l)) => {
-                (fgcolor, Some(bgcolor.adjust_lightness(*l)))
             }
             _ => (fgcolor, bgcolor),
         }
@@ -554,7 +544,7 @@ mod test {
     #[case::base((5, 5))]
     #[case::realistic((274, 75))]
     fn get_layer_validate_draw_buffer_size(#[case] dims: (usize, usize)) -> Result<()> {
-        let mut canvas = Canvas::new(dims.0, dims.1);
+        let canvas = Canvas::new(dims.0, dims.1);
         let dbuf = canvas.get_layer(0)?;
         let inner = dbuf.lock();
         assert_eq!(inner.buf.len(), dims.1);
@@ -576,7 +566,7 @@ mod test {
         #[case] canvas_dims: (usize, usize),
         #[case] rect: Rectangle,
     ) -> Result<()> {
-        let mut canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
+        let canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
         let buffer = canvas.get_draw_buffer(rect.clone())?;
 
         let inner = buffer.lock();
@@ -614,7 +604,7 @@ mod test {
         #[case] canvas_dims: (usize, usize),
         #[case] rect: Rectangle,
     ) -> Result<()> {
-        let mut canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
+        let canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
         let dbuf = canvas.get_draw_buffer(rect.clone())?;
 
         let mut idxs: Vec<Idx> = Vec::new();

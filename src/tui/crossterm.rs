@@ -5,11 +5,10 @@ use crossterm::{
     cursor,
     event::{self, Event as CrossTermEvent, KeyCode, KeyEvent},
     style,
-    style::Color,
     terminal, ExecutableCommand, QueueableCommand,
 };
 
-use super::canvas::{Canvas, Modifier};
+use super::canvas::Canvas;
 use super::error::Result;
 use super::events::{Event, EventSource, UserInput};
 use super::geometry::Direction;

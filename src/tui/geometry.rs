@@ -221,17 +221,6 @@ pub(crate) enum Direction {
     Down,
 }
 
-impl Direction {
-    pub(crate) fn opposite(&self) -> Direction {
-        match self {
-            Self::Left => Self::Right,
-            Self::Right => Self::Left,
-            Self::Up => Self::Down,
-            Self::Down => Self::Up,
-        }
-    }
-}
-
 impl std::fmt::Display for Direction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {

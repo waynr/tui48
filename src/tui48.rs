@@ -5,7 +5,7 @@ use palette::{FromColor, Lch, Srgb};
 
 use crate::engine::board::Board;
 use crate::engine::round::Idx as BoardIdx;
-use crate::engine::round::{AnimationHint, Hint, Round};
+use crate::engine::round::{AnimationHint, Hint};
 
 use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
@@ -99,8 +99,6 @@ impl Tui48Board {
         let (width, height) = game.dimensions();
         let round = game.current();
         let mut slots = Vec::with_capacity(height);
-        let x_offset = BOARD_FIXED_X_OFFSET + BOARD_BORDER_WIDTH + BOARD_X_PADDING;
-        let y_offset = BOARD_FIXED_Y_OFFSET + BOARD_BORDER_WIDTH;
         for y in 0..height {
             let mut row = Vec::with_capacity(width);
             for x in 0..width {
@@ -295,9 +293,6 @@ impl Tui48Board {
 
                         // the slot we've been working with is the new slot for this index
                         None => slot.take(),
-                        // this should be unreachable because we never consider static or empty
-                        // slots in the moving_slots or done_slots of Tui48Board
-                        _ => unreachable!(),
                     };
                     match self.done_slots.insert(idx, new_done_slot) {
                         Some(s) => drop(s),
@@ -573,7 +568,7 @@ impl Slot {
     fn new_value(&self) -> Option<u16> {
         match self {
             Self::Empty => None,
-            Self::Static(t) => None,
+            Self::Static(_) => None,
             Self::Sliding(st) => st.new_value(),
         }
     }
@@ -597,7 +592,7 @@ impl Slot {
     fn to_rectangle(&self) -> Option<Rectangle> {
         match self {
             Self::Empty => None,
-            Self::Static(t) => None,
+            Self::Static(_) => None,
             Self::Sliding(st) => Some(st.to_rectangle()),
         }
     }
@@ -774,7 +769,7 @@ struct Colors {
 static DEFAULT_COLORS: OnceLock<Colors> = OnceLock::new();
 
 pub(crate) fn init() -> Result<()> {
-    if let Some(p) = DEFAULT_COLORS.get() {
+    if let Some(_) = DEFAULT_COLORS.get() {
         // already set, no need to do anything else
         return Ok(());
     }
@@ -948,9 +943,9 @@ mod test {
     use env_logger;
     use log::Log;
     use rand::SeedableRng;
-    use rstest::*;
 
     use super::*;
+    use crate::engine::round::Round;
 
     fn generate_round_from(idxs: HashMap<BoardIdx, u16>) -> Round {
         let mut round = Round::default();
@@ -958,7 +953,7 @@ mod test {
             for y in 0..3 {
                 let idx = BoardIdx(x, y);
                 if let Some(v) = idxs.get(&idx) {
-                    round.set_value(&idx, v.clone());
+                    round._set_value(&idx, v.clone());
                 }
             }
         }
@@ -974,7 +969,7 @@ mod test {
         let rng = rand::rngs::SmallRng::seed_from_u64(10);
         let mut game_board = Board::new(rng);
         let round = generate_round_from(idxs);
-        game_board.set_initial_round(round);
+        game_board._set_initial_round(round);
 
         let tui_board = Tui48Board::new(&game_board, &mut canvas)?;
         Ok((game_board, canvas, tui_board))

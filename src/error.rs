@@ -29,17 +29,11 @@ pub(crate) enum Error {
     #[error("unable to retrieve drawbuffer: {context:?}")]
     UnableToRetrieveSlot { context: String },
 
-    #[error("unexpected strong reference in smart pointer")]
-    UnexpectedStrongReference,
-
     #[error("cannot convert slot to static tile slot")]
     CannotConvertToStatic,
 
     #[error("cannot convert {idx:?} to sliding tile slot")]
     CannotConvertToSliding { idx: Option<crate::engine::round::Idx> },
-
-    #[error("cannot convert slot to new sliding tile slot")]
-    CannotConvertToNewSlidingTileSlot,
 
     #[error("terminal too small, required minimum size {0} x {1}")]
     TerminalTooSmall(usize, usize),

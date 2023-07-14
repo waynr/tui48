@@ -79,16 +79,6 @@ impl AnimationHint {
     pub(crate) fn hints(&self) -> Vec<(Idx, Hint)> {
         self.hint.clone()
     }
-
-    pub(crate) fn remove(&mut self, idx: &Idx, hint: &Hint) {
-        let mut remove_idx = 0usize;
-        for (hint_idx, (i, h)) in self.hint.iter().enumerate() {
-            if *i == *idx && *h == *hint {
-                remove_idx = hint_idx;
-            }
-        }
-        let _ = self.hint.remove(remove_idx);
-    }
 }
 
 pub(crate) type Card = u16;
@@ -223,7 +213,9 @@ impl Round {
         *rf = value;
     }
 
-    pub(crate) fn set_value(&mut self, idx: &Idx, value: u16) {
+    // used in tui48 test suite to set the value of a given round index. underscore-prefixed to
+    // avoid build warnings while still allowing the method to be used in other modules' tests.
+    pub(crate) fn _set_value(&mut self, idx: &Idx, value: u16) {
         let rf = self.get_mut(idx);
         *rf = value;
     }
@@ -365,7 +357,7 @@ mod test {
         ] {
             let mut shifted = initial.clone();
             let mut rng = rng();
-            let hint = shifted.shift(&mut rng, &direction);
+            let _ = shifted.shift(&mut rng, &direction);
             assert_eq!(initial, shifted, "shifting {:?}", direction);
             assert_eq!(initial.score, shifted.score, "shifting {:?}", direction);
         }
@@ -434,7 +426,7 @@ mod test {
 
         let mut shifted = initial.clone();
         let mut rng = rng();
-        let hint = shifted.shift(&mut rng, &direction);
+        let _ = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 
@@ -487,7 +479,7 @@ mod test {
     fn combine(#[case] direction: Direction, #[case] initial: Round, #[case] expected: Round) {
         let mut shifted = initial.clone();
         let mut rng = rng();
-        let hint = shifted.shift(&mut rng, &direction);
+        let _ = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 }

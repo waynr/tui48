@@ -47,15 +47,14 @@ impl Board {
             .clone()
     }
 
-    pub(crate) fn previous(&self) -> Option<Round> {
-        self.rounds.iter().rev().nth(2).cloned()
-    }
-
     pub(crate) fn dimensions(&self) -> (usize, usize) {
         (4, 4)
     }
 
-    pub(crate) fn set_initial_round(&mut self, round: Round) {
+    // used in the tui48 module's test suite to more deterministically set the desired state of
+    // play for the board. underscore-prefixed in order to prevent compiler warnings about dead
+    // code
+    pub(crate) fn _set_initial_round(&mut self, round: Round) {
         let mut v = Vec::with_capacity(1);
         v.push(round);
         self.rounds = v;
