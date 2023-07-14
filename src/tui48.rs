@@ -202,7 +202,8 @@ impl Tui48Board {
                 r
             }
             Direction::Up => {
-                let r = Tui48Board::tile_rectangle(to_idx.x(), 4, LOWER_ANIMATION_LAYER_IDX);
+                let mut r = Tui48Board::tile_rectangle(to_idx.x(), 4, LOWER_ANIMATION_LAYER_IDX);
+                r.0 .1 -= 2;
                 r
             }
             Direction::Down => {
