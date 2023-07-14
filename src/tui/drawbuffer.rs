@@ -18,7 +18,11 @@ pub(crate) struct DrawBufferInner {
 impl std::fmt::Display for DrawBufferInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in self.buf.iter() {
-            write!(f, "{}\n", row.iter().map(|t| t.content()).collect::<String>())?
+            write!(
+                f,
+                "{}\n",
+                row.iter().map(|t| t.content()).collect::<String>()
+            )?
         }
         Ok(())
     }
