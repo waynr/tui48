@@ -313,10 +313,24 @@ impl std::fmt::Display for Tui48Board {
                 .enumerate()
                 .map(|(x, slot)| {
                     let slot = match slot {
-                        Slot::Empty => self.moving_slots.iter().find(|s| match s {
-                            Slot::Sliding(st) => st.inner.idx.x() == x && st.inner.idx.y() == y,
-                            _ => false,
-                        }),
+                        Slot::Empty => self
+                            .moving_slots
+                            .iter()
+                            .find(|s| match s {
+                                Slot::Sliding(st) => st.inner.idx.x() == x && st.inner.idx.y() == y,
+                                _ => false,
+                            })
+                            .or_else(|| {
+                                self.done_slots
+                                    .iter()
+                                    .find(|(_, s)| match s {
+                                        Slot::Sliding(st) => {
+                                            st.inner.idx.x() == x && st.inner.idx.y() == y
+                                        }
+                                        _ => false,
+                                    })
+                                    .map(|(_, s)| s)
+                            }),
                         _ => Some(slot),
                     };
                     if let Some(s) = slot {
