@@ -514,6 +514,7 @@ mod test {
     use super::*;
     use rstest::*;
 
+    use super::super::error::TuiError;
     use super::super::geometry::Bounds2D;
 
     fn rectangle(x: usize, y: usize, z: usize, width: usize, height: usize) -> Rectangle {
@@ -548,10 +549,15 @@ mod test {
         assert_eq!(count, expected);
     }
 
+    // #[case::<CASENAME>(
+    //     rectangle(<X>, <Y>, <Z>, <WIDTH>, <HEIGHT>),
+    // )]
     #[rstest]
     #[case::base(rectangle(0, 0, 0, 5, 5))]
     #[case::asymmetric(rectangle(0, 0, 0, 274, 75))]
     #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
+    #[case::zero_width_draw_buffer(rectangle(0, 0, 0, 0, 10))]
+    #[case::zero_height_draw_buffer(rectangle(0, 0, 0, 10, 0))]
     fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
         let canvas = Canvas::new(rect.width() * 2, rect.height() * 2);
         let (sender, receiver) = channel();
@@ -569,6 +575,54 @@ mod test {
         drop(dbuf);
         verify_messages_sent(&receiver, rect.width() * rect.height());
 
+        Ok(())
+    }
+
+    #[rstest]
+    // #[case::base(
+    //      canvas_width, canvas_height,
+    //      rectangle(<X>, <Y>, <Z>, <WIDTH>, <HEIGHT>)
+    //      target_layer,
+    // )]
+    #[case::base_same_layer(rectangle(0, 0, 0, 5, 5), 1)]
+    #[case::one_layer_down(rectangle(0, 0, 1, 5, 5), 0)]
+    #[case::one_layer_up(rectangle(0, 0, 1, 5, 5), 2)]
+    fn drawbuffer_switch_layer(#[case] rect: Rectangle, #[case] target_layer: usize) -> Result<()> {
+        let canvas = Canvas::new(rect.width() * 2, rect.height() * 2);
+        let mut dbuf = canvas.get_draw_buffer(rect.clone())?;
+        for _ in 0..10 {
+            dbuf.switch_layer(target_layer)?;
+            dbuf.switch_layer(rect.0 .2)?;
+        }
+        Ok(())
+    }
+
+    #[rstest]
+    // #[case::base(
+    //      canvas_width, canvas_height,
+    //      rectangle(<X>, <Y>, <Z>, <WIDTH>, <HEIGHT>)
+    // )]
+    #[case::rectangle_larger_than_canvas(100, 100, rectangle(0, 0, 0, 200, 105))]
+    #[case::draw_buffer_far_outside_canvas_y_bounds(100, 100, rectangle(0, 1000, 0, 1, 1))]
+    #[case::draw_buffer_far_outside_canvas_x_bounds(100, 100, rectangle(1000, 0, 0, 1, 1))]
+    // TODO: the following test case causes `cargo test` to hang indefinitely. the hang is somehow
+    // related to requesting a layer index that's not currently supported by the tui::canvas::Stack
+    // type
+    //#[case::draw_buffer_far_outside_canvas_z_bounds(100, 100, rectangle(0, 0, 8, 1, 1))]
+    #[case::draw_buffer_overlaps_on_right_edge(100, 100, rectangle(50, 50, 0, 1, 100))]
+    #[case::draw_buffer_overlaps_on_bottom_edge(100, 100, rectangle(50, 50, 0, 100, 1))]
+    // TODO: the following two test cases aren't possible since we don't support negative coordinates
+    // (maybe we should though)
+    //#[case::draw_buffer_overlaps_on_left_edge(100, 100, rectangle(0, 0, 0, 1, 100))]
+    //#[case::draw_buffer_overlaps_on_top_edge(100, 100, rectangle(0, 0, 0, 100, 1))]
+    fn drawbuffer_switch_layer_error(
+        #[case] canvas_height: usize,
+        #[case] canvas_width: usize,
+        #[case] rect: Rectangle,
+    ) -> Result<()> {
+        let canvas = Canvas::new(canvas_height, canvas_width);
+        let r = canvas.get_draw_buffer(rect.clone());
+        assert!(r.is_err());
         Ok(())
     }
 }
