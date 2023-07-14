@@ -224,6 +224,7 @@ impl DrawBufferInner {
     fn translate(&mut self, dir: Direction) -> Result<()> {
         self.rectangle.translate(1, &dir)?;
         let canvas_bounds = self.canvas.bounds();
+        log::trace!("translating DrawBuffer {}", dir);
         match dir {
             Direction::Left => {
                 for t in self.buf.iter_mut().flatten() {
@@ -231,7 +232,11 @@ impl DrawBufferInner {
                     let mut new_idx = current_idx.clone();
                     if new_idx.0 > 0 {
                         new_idx.0 -= 1
-                    } //TODO: figure out how to handle the 0 case
+                    } else {
+                        return Err(
+                            InnerError::DrawBufferTranslationFailed(String::from("")).into()
+                        );
+                    }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
@@ -242,7 +247,11 @@ impl DrawBufferInner {
                     let mut new_idx = current_idx.clone();
                     if new_idx.0 < canvas_bounds.width() {
                         new_idx.0 += 1
-                    };
+                    } else {
+                        return Err(
+                            InnerError::DrawBufferTranslationFailed(String::from("")).into()
+                        );
+                    }
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;
                     t.set_idx(&new_idx);
                 }
@@ -253,6 +262,10 @@ impl DrawBufferInner {
                     let mut new_idx = current_idx.clone();
                     if new_idx.1 > 0 {
                         new_idx.1 -= 1
+                    } else {
+                        return Err(
+                            InnerError::DrawBufferTranslationFailed(String::from("")).into()
+                        );
                     }
 
                     self.canvas.swap_tuxels(current_idx, new_idx.clone())?;

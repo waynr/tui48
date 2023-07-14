@@ -211,6 +211,7 @@ impl Tui48Board {
                 r
             }
         };
+        log::trace!("getting new drawbuffer for rectangle {}", db_rectangle);
         let buf = self.canvas.get_draw_buffer(db_rectangle)?;
         let mut t = Tile::new(value, to_idx.clone(), buf);
         t.draw()?;
@@ -225,7 +226,7 @@ impl Tui48Board {
     fn setup_animation(&mut self, hints: AnimationHint) -> Result<()> {
         log::trace!("setting up animation with hints:\n{0}", hints);
         for (idx, hint) in hints.hints() {
-            log::trace!("setting up animation for hint: {0}", hint);
+            log::trace!("setting up animation for hint {0} -> {1}", idx, hint);
             let slot = self.get_slot(&idx)?;
             let new_slot = match hint.clone() {
                 Hint::ToIdx(to_idx) => Slot::to_sliding(slot, to_idx, None)?,
@@ -236,13 +237,23 @@ impl Tui48Board {
                 }
             };
             self.moving_slots.push(new_slot);
-            log::trace!("after with hint {0}:\n{1}", hint, self);
+            log::trace!(
+                "Tui48Board after setting up hint {0} -> {1}:\n{2}",
+                idx,
+                hint,
+                self
+            );
+            log::trace!(
+                "Canvas after setting up animation for hint\n{}",
+                self.canvas
+            );
         }
         Ok(())
     }
 
     fn teardown_animation(&mut self) -> Result<()> {
         log::trace!("tearing down animation");
+        log::trace!("current canvas:\n{}", self.canvas);
         for slot in self
             .done_slots
             .drain(0..)
@@ -259,6 +270,7 @@ impl Tui48Board {
     }
 
     fn animate(&mut self) -> Result<bool> {
+        log::trace!("about to animate a frame");
         let should_continue = self
             .moving_slots
             .iter_mut()
@@ -267,6 +279,10 @@ impl Tui48Board {
                 match slot {
                     Slot::Empty => return Ok(false),
                     _ => (),
+                }
+                let idx = slot.idx()?;
+                if let Some(bidx) = slot.board_index() {
+                    log::trace!("about to animate slot {}\n{}", bidx, slot);
                 }
                 let c = slot.animate()?;
                 if !c {
@@ -278,6 +294,7 @@ impl Tui48Board {
             .collect::<Result<Vec<bool>>>()?
             .iter()
             .fold(false, |b, n| b | n);
+        log::trace!("finished animating a frame");
         Ok(should_continue)
     }
 }
@@ -433,7 +450,11 @@ impl Slot {
             }
         };
 
-        log::trace!("about move buffer to layer {0}\n{1}", UPPER_ANIMATION_LAYER_IDX, t.buf);
+        log::trace!(
+            "about move buffer to layer {0}\n{1}",
+            UPPER_ANIMATION_LAYER_IDX,
+            t.buf
+        );
         t.buf.switch_layer(UPPER_ANIMATION_LAYER_IDX)?;
         t.idx = to_idx.clone();
         if let Some(v) = new_value {
@@ -839,7 +860,8 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     .tui_board
                     .take()
                     .expect("why wouldn't we have a tui board at this point?");
-                log::trace!("prior to setting up animation\n{}", tui_board);
+                log::trace!("Tui48Board prior to setting up animation\n{}", tui_board);
+                log::trace!("Canvas prior to setting up animation\n{}", self.canvas);
                 tui_board.setup_animation(hint)?;
                 log::trace!("after setting up animation\n{}", tui_board);
                 let mut fc = 0;
