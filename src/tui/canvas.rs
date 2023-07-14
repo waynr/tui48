@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use super::colors::Rgb;
 use super::drawbuffer::{DBTuxel, DrawBuffer};
 use super::error::{InnerError, Result, TuiError};
-use super::geometry::{Bounds2D, Idx, Indices, Rectangle};
+use super::geometry::{Bounds2D, Geometry, Idx, Indices, Rectangle};
 use super::tuxel::Tuxel;
 
 const CANVAS_DEPTH: usize = 8;
@@ -23,6 +23,7 @@ struct CanvasInner {
 impl CanvasInner {
     fn get_draw_buffer(&mut self, c: Canvas, r: Rectangle) -> Result<DrawBuffer> {
         self.reclaim();
+        self.rectangle.contains_or_err(Geometry::Rectangle(&r))?;
         let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), c);
         for (y, row) in self
             .grid
@@ -117,8 +118,8 @@ impl CanvasInner {
 
     fn swap_tuxels(&mut self, idx1: Idx, idx2: Idx) -> Result<()> {
         log::trace!("swapping {0} and {1}", idx1, idx2);
-        self.rectangle.contains_or_err(&idx1)?;
-        self.rectangle.contains_or_err(&idx2)?;
+        self.rectangle.contains_or_err(Geometry::Idx(&idx1))?;
+        self.rectangle.contains_or_err(Geometry::Idx(&idx2))?;
         let mut c1 = self.acquire_cell(&idx1)?;
         let mut c2 = match self.acquire_cell(&idx2) {
             Err(e) => {

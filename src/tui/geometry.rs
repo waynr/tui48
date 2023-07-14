@@ -122,18 +122,38 @@ impl Rectangle {
     }
 
     #[inline(always)]
-    pub(crate) fn contains_or_err(&self, idx: &Idx) -> Result<()> {
-        if idx.x() < self.x() || idx.x() > self.x() + self.width() {
-            return Err(InnerError::OutOfBoundsX(idx.x()).into());
+    pub(crate) fn contains_or_err(&self, geo: Geometry) -> Result<()> {
+        match geo {
+            Geometry::Idx(idx) => {
+                if idx.x() < self.x() || idx.x() > self.x() + self.width() {
+                    return Err(InnerError::OutOfBoundsX(idx.x()).into());
+                }
+                if idx.y() < self.y() || idx.y() > self.y() + self.height() {
+                    return Err(InnerError::OutOfBoundsY(idx.y()).into());
+                }
+                Ok(())
+            }
+            Geometry::Rectangle(rect) => {
+                let (x_extent, y_extent) = rect.extents();
+                if x_extent > self.width() {
+                    return Err(InnerError::OutOfBoundsX(x_extent).into());
+                }
+                if y_extent > self.height() {
+                    return Err(InnerError::OutOfBoundsY(y_extent).into());
+                }
+                Ok(())
+            }
         }
-        if idx.y() < self.y() || idx.y() > self.y() + self.height() {
-            return Err(InnerError::OutOfBoundsY(idx.y()).into());
-        }
-        Ok(())
     }
 }
 
+pub(crate) enum Geometry<'a> {
+    Idx(&'a Idx),
+    Rectangle(&'a Rectangle),
+}
+
 pub(crate) struct Indices {
+    from_x: usize,
     current_x: usize,
     to_x: usize,
 
