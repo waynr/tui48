@@ -5,7 +5,7 @@ use rand::Rng;
 
 use crate::tui::geometry::Direction;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
 impl std::fmt::Display for Idx {
@@ -219,6 +219,11 @@ impl Round {
     }
 
     fn set(&mut self, idx: &Idx, value: Card) {
+        let rf = self.get_mut(idx);
+        *rf = value;
+    }
+
+    pub(crate) fn set_value(&mut self, idx: &Idx, value: u16) {
         let rf = self.get_mut(idx);
         *rf = value;
     }

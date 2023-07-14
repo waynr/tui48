@@ -54,4 +54,10 @@ impl Board {
     pub(crate) fn dimensions(&self) -> (usize, usize) {
         (4, 4)
     }
+
+    pub(crate) fn set_initial_round(&mut self, round: Round) {
+        let mut v = Vec::with_capacity(1);
+        v.push(round);
+        self.rounds = v;
+    }
 }
