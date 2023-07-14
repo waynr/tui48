@@ -14,7 +14,10 @@ impl Board {
     pub(crate) fn new(mut rng: impl RngCore + 'static) -> Self {
         let mut rounds = Vec::with_capacity(2000);
         rounds.push(Round::random(&mut rng));
-        Self { rng: Box::new(rng), rounds }
+        Self {
+            rng: Box::new(rng),
+            rounds,
+        }
     }
 
     pub(crate) fn score(&self) -> Score {
@@ -38,7 +41,10 @@ impl Board {
     }
 
     pub(crate) fn current(&self) -> Round {
-        self.rounds.last().expect("a board must always have at least one round").clone()
+        self.rounds
+            .last()
+            .expect("a board must always have at least one round")
+            .clone()
     }
 
     pub(crate) fn previous(&self) -> Option<Round> {

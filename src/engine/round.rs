@@ -35,8 +35,12 @@ impl std::fmt::Display for Hint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ToIdx(idx) => write!(f, "Hint::ToIdx({0})", idx),
-            Self::NewValueToIdx(value, idx) => write!(f, "Hint::NewValueToIdx({0}, {1})", value, idx),
-            Self::NewTile(value, direction) => write!(f, "Hint::NewTile({0}, {1})", value, direction),
+            Self::NewValueToIdx(value, idx) => {
+                write!(f, "Hint::NewValueToIdx({0}, {1})", value, idx)
+            }
+            Self::NewTile(value, direction) => {
+                write!(f, "Hint::NewTile({0}, {1})", value, direction)
+            }
         }
     }
 }
@@ -49,7 +53,7 @@ pub(crate) struct AnimationHint {
 
 impl std::fmt::Display for AnimationHint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.hint.len() > 0  {
+        if self.hint.len() > 0 {
             write!(f, "\n")?;
         }
         for (idx, hint) in &self.hint {
