@@ -188,8 +188,9 @@ impl CanvasInner {
         let rect2_indices: Indices = rect2.clone().into();
         log::trace!("swapping {0} and {1}", rect1, rect2);
         for (idx1, idx2) in rect1_indices.zip(rect2_indices) {
-            self.swap_tuxels(idx1, idx2)?
+            self.swap_tuxels(idx1, idx2)?;
         }
+        self.reclaim();
         Ok(())
     }
 
@@ -307,6 +308,11 @@ impl Canvas {
 
     pub(crate) fn layer_occupied(&self, zdx: usize) -> bool {
         self.lock().layer_occupied(zdx)
+    }
+
+    pub(crate) fn reclaim(&mut self) -> Result<()> {
+        self.lock().reclaim();
+        Ok(())
     }
 }
 

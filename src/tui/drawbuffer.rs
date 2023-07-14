@@ -275,6 +275,7 @@ impl DrawBufferInner {
                 }
             }
         }
+        self.canvas.reclaim()?;
         Ok(())
     }
 }
@@ -406,6 +407,7 @@ impl Drop for DrawBuffer {
                 let _ = self.sender.send(tuxel);
             }
         }
+        let _ = inner.canvas.reclaim();
     }
 }
 
