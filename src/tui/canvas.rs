@@ -431,11 +431,15 @@ impl Stack {
     }
 
     fn layer_occupied(&self, zdx: usize) -> bool {
-        self.lock().cells.iter().nth(zdx).map_or(false, |c| match c {
-            Cell::Empty => false,
-            Cell::DBTuxel(_) => true,
-            Cell::Tuxel(_) => false,
-        })
+        self.lock()
+            .cells
+            .iter()
+            .nth(zdx)
+            .map_or(false, |c| match c {
+                Cell::Empty => false,
+                Cell::DBTuxel(_) => true,
+                Cell::Tuxel(_) => false,
+            })
     }
 
     fn lock(&self) -> MutexGuard<StackInner> {
