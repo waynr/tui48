@@ -7,6 +7,8 @@ use super::error::{InnerError, Result, TuiError};
 use super::geometry::{Bounds2D, Idx, Indices, Rectangle};
 use super::tuxel::Tuxel;
 
+const CANVAS_DEPTH: usize = 8;
+
 struct CanvasInner {
     grid: Vec<Vec<Stack>>,
     rectangle: Rectangle,
@@ -188,6 +190,17 @@ impl CanvasInner {
             self.swap_tuxels(idx1, idx2)?
         }
         Ok(())
+    }
+
+    fn layer_occupied(&self, zdx: usize) -> bool {
+        for row in self.grid.iter() {
+            for stack in row.iter() {
+                if stack.layer_occupied(zdx) {
+                    return true
+                }
+            }
+        }
+        false
     }
 }
 

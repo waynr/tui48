@@ -855,3 +855,96 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use rand::SeedableRng;
+    use rstest::*;
+
+    use super::*;
+
+    fn generate_round_from(idxs: HashMap<BoardIdx, u16>) -> Round {
+        let mut round = Round::default();
+        for x in 0..3 {
+            for y in 0..3 {
+                let idx = BoardIdx(x, y);
+                if let Some(v) = idxs.get(&idx) {
+                    round.set_value(&idx, v.clone());
+                }
+            }
+        }
+        round
+    }
+
+    fn setup(
+        width: usize,
+        height: usize,
+        idxs: HashMap<BoardIdx, u16>,
+    ) -> Result<(Board, Canvas, Tui48Board)> {
+        let mut canvas = Canvas::new(width, height);
+        let rng = rand::rngs::SmallRng::seed_from_u64(10);
+        let mut game_board = Board::new(rng);
+        let round = generate_round_from(idxs);
+        game_board.set_initial_round(round);
+
+        let tui_board = Tui48Board::new(&game_board, &mut canvas)?;
+        Ok((game_board, canvas, tui_board))
+    }
+
+    fn verify_occupied_layers(c: &Canvas, occupied: Vec<usize>, not_occupied: Vec<usize>) {
+        for zdx in occupied.iter() {
+            assert!(c.layer_occupied(*zdx), "layer {} should be occupied", zdx)
+        }
+        for zdx in not_occupied.iter() {
+            assert!(
+                !c.layer_occupied(*zdx),
+                "layer {} should not be occupied",
+                zdx
+            )
+        }
+    }
+
+    #[test]
+    fn test_slide() -> Result<()> {
+        init()?;
+        let idxs = HashMap::from([(BoardIdx(0, 0), 2), (BoardIdx(0, 1), 2)]);
+        let (mut game_board, canvas, mut tui_board) = setup(100, 100, idxs)?;
+
+        let hint = game_board
+            .shift(Direction::Down)
+            .expect("down should definitely result in hints");
+        assert_eq!(hint.hints().len(), 3);
+
+        let hints = hint.hints();
+        let (idx1, hint1) = hints.get(0).expect("expecting three hints");
+        let (idx2, hint2) = hints.get(1).expect("expecting three hints");
+        let (idx3, hint3) = hints.get(2).expect("expecting three hints");
+
+        assert_eq!(*idx1, BoardIdx(0, 1));
+        assert!(matches!(hint1, Hint::ToIdx(BoardIdx(0, 3))));
+        assert_eq!(*idx2, BoardIdx(0, 0));
+        assert!(matches!(hint2, Hint::NewValueToIdx(4, BoardIdx(0, 3))));
+        assert_eq!(*idx3, BoardIdx(2, 0));
+        assert!(matches!(hint3, Hint::NewTile(2, Direction::Down)));
+
+        verify_occupied_layers(&canvas, vec![2, 4], vec![0, 1, 3, 5, 6, 7]);
+
+        tui_board.setup_animation(hint)?;
+
+        // TODO: verify board after setup
+        verify_occupied_layers(&canvas, vec![2, 3, 5], vec![0, 1, 4, 6, 7]);
+
+        while tui_board.animate()? {
+            // TODO: verify intermediate states after every animation frame
+            verify_occupied_layers(&canvas, vec![2, 3, 5], vec![0, 1, 4, 6, 7]);
+        }
+
+        tui_board.teardown_animation()?;
+        verify_occupied_layers(&canvas, vec![2, 4], vec![0, 1, 3, 5, 6, 7]);
+        // TODO: verify canvas after teardown
+
+        Ok(())
+    }
+}
