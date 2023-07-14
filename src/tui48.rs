@@ -55,7 +55,7 @@ struct Tui48Board {
     slots: Vec<Vec<Slot>>,
     disappearing_slots: Vec<Slot>,
     moving_slots: Vec<Slot>,
-    done_slots: Vec<Slot>,
+    done_slots: HashMap<BoardIdx, Slot>,
 }
 
 const BOARD_FIXED_Y_OFFSET: usize = 5;
@@ -128,7 +128,7 @@ impl Tui48Board {
             _score: score,
             slots,
             moving_slots: Vec::new(),
-            done_slots: Vec::new(),
+            done_slots: HashMap::new(),
             disappearing_slots: Vec::new(),
         })
     }
@@ -256,8 +256,8 @@ impl Tui48Board {
         log::trace!("current canvas:\n{}", self.canvas);
         for slot in self
             .done_slots
-            .drain(0..)
-            .map(Slot::to_static)
+            .drain()
+            .map(|(_, slot)| Slot::to_static(slot))
             .collect::<Result<Vec<_>>>()?
             .into_iter()
         {
@@ -286,8 +286,22 @@ impl Tui48Board {
                 }
                 let c = slot.animate()?;
                 if !c {
-                    let s = slot.take();
-                    self.done_slots.push(s);
+                    let new_done_slot = match self.done_slots.get_mut(&idx) {
+                        // if there is a matching done slot for the current slot's index, then we
+                        // need to decide which to keep and avoid tearing down the animation twice
+                        // on the same index
+                        Some(done_slot) => Self::keep_largest_value_tile(done_slot, slot),
+
+                        // the slot we've been working with is the new slot for this index
+                        None => slot.take(),
+                        // this should be unreachable because we never consider static or empty
+                        // slots in the moving_slots or done_slots of Tui48Board
+                        _ => unreachable!(),
+                    };
+                    match self.done_slots.insert(idx, new_done_slot) {
+                        Some(s) => drop(s),
+                        _ => (),
+                    };
                 }
                 Ok(c)
             })
@@ -296,6 +310,38 @@ impl Tui48Board {
             .fold(false, |b, n| b | n);
         log::trace!("finished animating a frame");
         Ok(should_continue)
+    }
+
+    // take ownership of the contents of the slot with the highest value tile, return a new slot
+    // with the kept tile
+    fn keep_largest_value_tile(slot1: &mut Slot, slot2: &mut Slot) -> Slot {
+        match (slot1.new_value(), slot2.new_value()) {
+            (Some(_), None) => {
+                let s1 = slot1.take();
+                let _ = slot2.take();
+                s1
+            },
+            (None, Some(_)) => {
+                let s2 = slot2.take();
+                let _ = slot1.take();
+                s2
+            },
+            // i don't think this branch is very likely or even possible, but just in case it is I
+            // am adding a warning statement for the logs since this safe-ish approach to handling
+            // it might otherwise let it go unnoticed
+            (Some(v1), Some(v2)) => {
+                log::warn!("");
+                if v1 >= v2 {
+                    return slot1.take();
+                }
+                slot2.take()
+            }
+            // how likely is it that both slots are trying to take up the same board index but
+            // neither has a new value to give it preference? unlikely enough in my mind that
+            // unreachable!() is safe here and we don't need to check the current value of the
+            // tiles
+            (None, None) => unreachable!(),
+        }
     }
 }
 
