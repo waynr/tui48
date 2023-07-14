@@ -380,7 +380,7 @@ impl std::fmt::Display for Cell {
 /// abstraction at the same time.
 #[derive(Default)]
 struct StackInner {
-    cells: [Cell; 8],
+    cells: [Cell; CANVAS_DEPTH],
     idx: Idx,
 }
 
