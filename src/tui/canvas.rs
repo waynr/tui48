@@ -204,10 +204,36 @@ impl CanvasInner {
     }
 }
 
+impl std::fmt::Display for CanvasInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for i in 0..CANVAS_DEPTH {
+            if !self.layer_occupied(i) {
+                continue
+            }
+            write!(f, "canvas layer {}:\n", i)?;
+            for row in self.grid.iter() {
+                for stack in row.iter() {
+                    write!(f, "{}", stack.display_cell_type(i))?;
+                }
+                write!(f, "\n")?;
+            }
+            write!(f, "\n")?;
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
+
 /// A 2d grid of `Cell`s.
 #[derive(Clone)]
 pub(crate) struct Canvas {
     inner: Arc<Mutex<CanvasInner>>,
+}
+
+impl std::fmt::Display for Canvas {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.lock())
+    }
 }
 
 impl Canvas {
@@ -276,6 +302,10 @@ impl Canvas {
 
     pub(crate) fn swap_rectangles(&self, r1: &Rectangle, r2: &Rectangle) -> Result<()> {
         self.lock().swap_rectangles(r1, r2)
+    }
+
+    pub(crate) fn layer_occupied(&self, zdx: usize) -> bool {
+        self.lock().layer_occupied(zdx)
     }
 }
 
@@ -393,10 +423,26 @@ impl Stack {
             })
     }
 
+    fn layer_occupied(&self, zdx: usize) -> bool {
+        self.lock().cells.iter().nth(zdx).map_or(false, |c| match c {
+            Cell::Empty => false,
+            Cell::DBTuxel(_) => true,
+            Cell::Tuxel(_) => false,
+        })
+    }
+
     fn lock(&self) -> MutexGuard<StackInner> {
         self.inner
             .lock()
             .expect("TODO: handle mutex lock errors more gracefully")
+    }
+
+    fn display_cell_type(&self, zdx: usize) -> &str {
+        match &self.lock().cells[zdx] {
+            Cell::Empty => "E",
+            Cell::Tuxel(t) => "T",
+            Cell::DBTuxel(t) => "D",
+        }
     }
 }
 
