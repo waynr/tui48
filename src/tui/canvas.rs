@@ -306,6 +306,7 @@ impl Canvas {
         self.lock().swap_rectangles(r1, r2)
     }
 
+    #[cfg(test)]
     pub(crate) fn layer_occupied(&self, zdx: usize) -> bool {
         self.lock().layer_occupied(zdx)
     }

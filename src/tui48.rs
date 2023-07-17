@@ -954,7 +954,7 @@ mod test {
             for y in 0..3 {
                 let idx = BoardIdx(x, y);
                 if let Some(v) = idxs.get(&idx) {
-                    round._set_value(&idx, v.clone());
+                    round.set_value(&idx, v.clone());
                 }
             }
         }
@@ -970,7 +970,7 @@ mod test {
         let rng = rand::rngs::SmallRng::seed_from_u64(10);
         let mut game_board = Board::new(rng);
         let round = generate_round_from(idxs);
-        game_board._set_initial_round(round);
+        game_board.set_initial_round(round);
 
         let tui_board = Tui48Board::new(&game_board, &mut canvas)?;
         Ok((game_board, canvas, tui_board))

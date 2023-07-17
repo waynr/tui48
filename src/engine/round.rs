@@ -213,9 +213,8 @@ impl Round {
         *rf = value;
     }
 
-    // used in tui48 test suite to set the value of a given round index. underscore-prefixed to
-    // avoid build warnings while still allowing the method to be used in other modules' tests.
-    pub(crate) fn _set_value(&mut self, idx: &Idx, value: u16) {
+    #[cfg(test)]
+    pub(crate) fn set_value(&mut self, idx: &Idx, value: u16) {
         let rf = self.get_mut(idx);
         *rf = value;
     }

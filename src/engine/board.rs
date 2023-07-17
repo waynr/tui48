@@ -51,10 +51,8 @@ impl Board {
         (4, 4)
     }
 
-    // used in the tui48 module's test suite to more deterministically set the desired state of
-    // play for the board. underscore-prefixed in order to prevent compiler warnings about dead
-    // code
-    pub(crate) fn _set_initial_round(&mut self, round: Round) {
+    #[cfg(test)]
+    pub(crate) fn set_initial_round(&mut self, round: Round) {
         let mut v = Vec::with_capacity(1);
         v.push(round);
         self.rounds = v;
