@@ -263,7 +263,8 @@ impl Tui48Board {
             let idx = slot.idx()?;
             self.put_slot(&idx, slot)?;
         }
-        self.moving_slots = Vec::new();
+
+        let _ = self.moving_slots.drain(0..);
 
         Ok(())
     }
