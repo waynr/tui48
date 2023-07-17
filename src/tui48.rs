@@ -51,7 +51,7 @@ use crate::tui::renderer::Renderer;
 struct Tui48Board {
     canvas: Canvas,
     _board: DrawBuffer,
-    _score: DrawBuffer,
+    score: DrawBuffer,
     slots: Vec<Vec<Slot>>,
     disappearing_slots: Vec<Slot>,
     moving_slots: Vec<Slot>,
@@ -88,13 +88,7 @@ impl Tui48Board {
 
         let mut score =
             canvas.get_draw_buffer(Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3)))?;
-        score.draw_border()?;
-        score.fill(' ')?;
-        score.write_right(&format!("{}", game.score()))?;
-        score.modify(Modifier::SetBackgroundColor(75, 50, 25));
-        score.modify(Modifier::SetForegroundColor(0, 0, 0));
-        score.modify(Modifier::SetFGLightness(0.2));
-        score.modify(Modifier::SetBGLightness(0.8));
+        Self::draw_score(&mut score, game.score())?;
 
         let (width, height) = game.dimensions();
         let round = game.current();
@@ -123,7 +117,7 @@ impl Tui48Board {
         Ok(Self {
             canvas: canvas.clone(),
             _board: board,
-            _score: score,
+            score,
             slots,
             moving_slots: Vec::new(),
             done_slots: HashMap::new(),
@@ -150,6 +144,17 @@ impl Tui48Board {
         dbuf.draw_border()?;
         dbuf.fill(' ')?;
         dbuf.write_center(&format!("{}", value))?;
+        Ok(())
+    }
+
+    fn draw_score(dbuf: &mut DrawBuffer, value: u16) -> Result<()> {
+        dbuf.draw_border()?;
+        dbuf.fill(' ')?;
+        dbuf.write_right(&format!("{}", value))?;
+        dbuf.modify(Modifier::SetBackgroundColor(75, 50, 25));
+        dbuf.modify(Modifier::SetForegroundColor(0, 0, 0));
+        dbuf.modify(Modifier::SetFGLightness(0.2));
+        dbuf.modify(Modifier::SetBGLightness(0.8));
         Ok(())
     }
 
@@ -826,7 +831,6 @@ fn colors_from_value(value: u16) -> (Modifier, Modifier) {
 
 pub(crate) struct Tui48<R: Renderer, E: EventSource> {
     renderer: R,
-    redraw_entire: bool,
     event_source: E,
     canvas: Canvas,
     board: Board,
@@ -838,7 +842,6 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         let (width, height) = renderer.size_hint()?;
         Ok(Self {
             board,
-            redraw_entire: false,
             renderer,
             event_source,
             canvas: Canvas::new(width as usize, height as usize),
@@ -906,32 +909,27 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
 
     fn shift(&mut self, direction: Direction) -> Result<()> {
         if let Some(hint) = self.board.shift(direction) {
-            if self.redraw_entire {
-                let tb = self.tui_board.take();
-                drop(tb);
-                self.tui_board = Some(Tui48Board::new(&self.board, &mut self.canvas)?);
-            } else {
-                let mut tui_board = self
-                    .tui_board
-                    .take()
-                    .expect("why wouldn't we have a tui board at this point?");
-                log::trace!("Tui48Board prior to setting up animation\n{}", tui_board);
-                log::trace!("Canvas prior to setting up animation\n{}", self.canvas);
-                tui_board.setup_animation(hint)?;
-                log::trace!("after setting up animation\n{}", tui_board);
-                let mut fc = 0;
-                while tui_board.animate()? {
-                    log::trace!("generated animation frame {0}\n{1}", fc, tui_board);
-                    std::thread::sleep(std::time::Duration::from_millis(1));
-                    self.renderer.render(&self.canvas)?;
-                    log::trace!("rendered frame {} after sleeping 1ms", fc);
-
-                    fc += 1;
-                }
-                tui_board.teardown_animation()?;
+            let mut tui_board = self
+                .tui_board
+                .take()
+                .expect("why wouldn't we have a tui board at this point?");
+            Tui48Board::draw_score(&mut tui_board.score, self.board.score())?;
+            log::trace!("Tui48Board prior to setting up animation\n{}", tui_board);
+            log::trace!("Canvas prior to setting up animation\n{}", self.canvas);
+            tui_board.setup_animation(hint)?;
+            log::trace!("after setting up animation\n{}", tui_board);
+            let mut fc = 0;
+            while tui_board.animate()? {
+                log::trace!("generated animation frame {0}\n{1}", fc, tui_board);
+                std::thread::sleep(std::time::Duration::from_millis(1));
                 self.renderer.render(&self.canvas)?;
-                let _ = self.tui_board.replace(tui_board);
+                log::trace!("rendered frame {} after sleeping 1ms", fc);
+
+                fc += 1;
             }
+            tui_board.teardown_animation()?;
+            self.renderer.render(&self.canvas)?;
+            let _ = self.tui_board.replace(tui_board);
         }
         Ok(())
     }
