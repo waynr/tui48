@@ -1,41 +1,43 @@
-use super::geometry::Idx;
-use super::colors::Rgb;
+use std::sync::mpsc::SyncSender;
 
-#[derive(Default)]
+use super::colors::Rgb;
+use super::geometry::Idx;
+
 pub(crate) struct Tuxel {
     active: bool,
     content: char,
     idx: Idx,
+    idx_sender: SyncSender<Idx>,
     fgcolor: Option<Rgb>,
     bgcolor: Option<Rgb>,
 }
 
 impl Tuxel {
-    pub(crate) fn new(idx: Idx) -> Self {
+    pub(crate) fn new(idx: Idx, idx_sender: SyncSender<Idx>) -> Self {
         Tuxel {
-            // use radioactive symbol to indicate user hasn't set a value for this Tuxel.
-            //content: '\u{2622}',
-            //content: '\u{2566}',
             active: false,
             content: '-',
             fgcolor: None,
             bgcolor: None,
             idx,
+            idx_sender,
         }
     }
 
     pub(crate) fn set_content(&mut self, c: char) {
         self.active = true;
         self.content = c;
-    }
-
-    pub(crate) fn coordinates(&self) -> (usize, usize) {
-        (self.idx.0, self.idx.1)
+        self.idx_sender
+            .send(self.idx.clone())
+            .expect("idx sender has a big buffer, it shouldn't fail");
     }
 
     pub(crate) fn clear(&mut self) {
         self.active = false;
         self.content = ' ';
+        self.idx_sender
+            .send(self.idx.clone())
+            .expect("idx sender has a big buffer, it shouldn't fail");
     }
 
     pub(crate) fn active(&self) -> bool {
@@ -51,7 +53,10 @@ impl Tuxel {
     }
 
     pub(crate) fn set_idx(&mut self, idx: &Idx) {
-        self.idx = idx.clone()
+        self.idx = idx.clone();
+        self.idx_sender
+            .send(self.idx.clone())
+            .expect("idx sender has a big buffer, it shouldn't fail");
     }
 
     pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {

@@ -1,4 +1,4 @@
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::colors::Rgb;
@@ -14,7 +14,7 @@ struct CanvasInner {
     rectangle: Rectangle,
 
     idx_receiver: Receiver<Idx>,
-    idx_sender: Sender<Idx>,
+    idx_sender: SyncSender<Idx>,
 
     tuxel_receiver: Receiver<Tuxel>,
     tuxel_sender: Sender<Tuxel>,
@@ -36,7 +36,7 @@ impl CanvasInner {
                 let canvas_idx = Idx(x, y, r.0 .2);
                 let cell = cellstack.acquire(canvas_idx.z());
                 let tuxel = match cell {
-                    Cell::Tuxel(t) => t,
+                    Cell::Empty =>Tuxel::new(Idx(x, y, r.z()), self.idx_sender.clone()),
                     _ => return Err(InnerError::CellAlreadyOwned.into()),
                 };
                 let db_tuxel = dbuf.push(tuxel);
@@ -86,7 +86,7 @@ impl CanvasInner {
             match self.tuxel_receiver.try_recv() {
                 Ok(tuxel) => {
                     let idx = tuxel.idx();
-                    let _ = self.grid[idx.y()][idx.x()].replace(idx.z(), Cell::Tuxel(tuxel));
+                    let _ = self.grid[idx.y()][idx.x()].replace(idx.z(), Cell::Empty);
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     unreachable!();
@@ -145,9 +145,6 @@ impl CanvasInner {
                     Err(e) => return Err(e),
                 }
             }
-            Cell::Tuxel(ref mut t) => {
-                t.set_idx(&to_idx);
-            }
         }
         match &mut to_cell {
             Cell::Empty => (),
@@ -163,9 +160,6 @@ impl CanvasInner {
                     }) => (),
                     Err(e) => return Err(e),
                 }
-            }
-            Cell::Tuxel(ref mut t) => {
-                t.set_idx(&from_idx);
             }
         }
 
@@ -249,7 +243,7 @@ impl Canvas {
             }
             grid.push(row);
         }
-        let (idx_sender, idx_receiver) = channel();
+        let (idx_sender, idx_receiver) = sync_channel(10000);
         let (tuxel_sender, tuxel_receiver) = channel();
         let mut s = Self {
             inner: Arc::new(Mutex::new(CanvasInner {
@@ -282,7 +276,7 @@ impl Canvas {
         self.lock().get_layer(c, z)
     }
 
-    pub(crate) fn draw_all(&mut self) -> Result<()> {
+    fn draw_all(&mut self) -> Result<()> {
         self.lock().draw_all()
     }
 
@@ -321,14 +315,12 @@ impl Canvas {
 pub(crate) enum Cell {
     #[default]
     Empty,
-    Tuxel(Tuxel),
     DBTuxel(DBTuxel),
 }
 
 impl Cell {
     pub(crate) fn get_content(&self) -> Result<char> {
         match self {
-            Cell::Tuxel(t) => Ok(t.content()),
             Cell::DBTuxel(b) => b.content(),
             Cell::Empty => Ok('\u{2622}'),
         }
@@ -336,7 +328,6 @@ impl Cell {
 
     pub(crate) fn active(&self) -> Result<bool> {
         match self {
-            Cell::Tuxel(t) => Ok(t.active()),
             Cell::DBTuxel(b) => b.active(),
             Cell::Empty => Ok(false),
         }
@@ -344,7 +335,6 @@ impl Cell {
 
     pub(crate) fn coordinates(&self) -> (usize, usize) {
         match self {
-            Cell::Tuxel(t) => t.coordinates(),
             Cell::DBTuxel(d) => d.coordinates(),
             Cell::Empty => (0, 0),
         }
@@ -352,7 +342,6 @@ impl Cell {
 
     pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
         match self {
-            Cell::Tuxel(t) => t.colors(),
             Cell::DBTuxel(d) => d.colors(),
             Cell::Empty => (None, None),
         }
@@ -396,14 +385,14 @@ impl Stack {
             inner: Arc::new(Mutex::new(StackInner {
                 idx: Idx(x, y, 0),
                 cells: [
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 0))),
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 1))),
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 2))),
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 3))),
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 4))),
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 5))),
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 6))),
-                    Cell::Tuxel(Tuxel::new(Idx(x, y, 7))),
+                    Cell::Empty,
+                    Cell::Empty,
+                    Cell::Empty,
+                    Cell::Empty,
+                    Cell::Empty,
+                    Cell::Empty,
+                    Cell::Empty,
+                    Cell::Empty,
                 ],
             })),
         }
@@ -439,7 +428,6 @@ impl Stack {
             .map_or(false, |c| match c {
                 Cell::Empty => false,
                 Cell::DBTuxel(_) => true,
-                Cell::Tuxel(_) => false,
             })
     }
 
@@ -452,7 +440,6 @@ impl Stack {
     fn display_cell_type(&self, zdx: usize) -> &str {
         match &self.lock().cells[zdx] {
             Cell::Empty => "E",
-            Cell::Tuxel(_) => "T",
             Cell::DBTuxel(_) => "D",
         }
     }
@@ -488,7 +475,7 @@ impl Stack {
                 .get_content()
                 .ok()
         } else {
-            None
+            Some(' ')
         }
     }
 }
