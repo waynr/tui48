@@ -36,7 +36,7 @@ impl CanvasInner {
                 let canvas_idx = Idx(x, y, r.0 .2);
                 let cell = cellstack.acquire(canvas_idx.z());
                 let tuxel = match cell {
-                    Cell::Empty =>Tuxel::new(Idx(x, y, r.z()), self.idx_sender.clone()),
+                    Cell::Empty => Tuxel::new(Idx(x, y, r.z()), self.idx_sender.clone()),
                     _ => return Err(InnerError::CellAlreadyOwned.into()),
                 };
                 let db_tuxel = dbuf.push(tuxel);
@@ -577,9 +577,9 @@ mod test {
         }
     }
 
-    fn is_tuxel(cell: &Cell) -> bool {
+    fn is_empty(cell: &Cell) -> bool {
         match cell {
-            Cell::Tuxel(..) => true,
+            Cell::Empty => true,
             _ => false,
         }
     }
@@ -614,7 +614,7 @@ mod test {
         for idx in idxs.iter() {
             let inner = canvas.lock();
             let cell = &inner.grid[idx.1][idx.0].lock().cells[idx.2];
-            assert!(is_tuxel(cell));
+            assert!(is_empty(cell));
         }
 
         canvas.lock().reclaim();
@@ -622,7 +622,7 @@ mod test {
         for idx in idxs.iter() {
             let inner = canvas.lock();
             let cell = &inner.grid[idx.1][idx.0].lock().cells[idx.2];
-            assert!(is_tuxel(cell));
+            assert!(is_empty(cell));
         }
 
         Ok(())
