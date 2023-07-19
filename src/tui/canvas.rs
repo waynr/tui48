@@ -87,6 +87,9 @@ impl CanvasInner {
                 Ok(tuxel) => {
                     let idx = tuxel.idx();
                     let _ = self.grid[idx.y()][idx.x()].replace(idx.z(), Cell::Empty);
+                    self.idx_sender
+                        .send(idx)
+                        .expect("idx sender should have plenty of room for more idxes");
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     unreachable!();
