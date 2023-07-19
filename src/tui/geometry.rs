@@ -170,8 +170,8 @@ impl From<Rectangle> for Indices {
             from_x: r.x(),
             current_x: r.x(),
             current_y: r.y(),
-            to_x: r.x() + r.width(),
-            to_y: r.y() + r.height(),
+            to_x: r.x() + r.width() - 1,
+            to_y: r.y() + r.height() - 1,
         }
     }
 }
@@ -179,16 +179,16 @@ impl From<Rectangle> for Indices {
 impl Iterator for Indices {
     type Item = Idx;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_x == self.to_x && self.current_y == self.to_y {
+        if self.current_y > self.to_y {
             None
-        } else if self.current_x == self.to_x && self.current_y < self.to_y {
-            let idx = Idx(self.current_x, self.current_y, self.z);
-            self.current_x = self.from_x;
-            self.current_y += 1;
-            Some(idx)
         } else if self.current_x < self.to_x {
             let idx = Idx(self.current_x, self.current_y, self.z);
             self.current_x += 1;
+            Some(idx)
+        } else if self.current_x == self.to_x && self.current_y <= self.to_y {
+            let idx = Idx(self.current_x, self.current_y, self.z);
+            self.current_x = self.from_x;
+            self.current_y += 1;
             Some(idx)
         } else {
             unreachable!();
