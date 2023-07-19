@@ -245,7 +245,7 @@ impl Canvas {
         }
         let (idx_sender, idx_receiver) = sync_channel(10000);
         let (tuxel_sender, tuxel_receiver) = channel();
-        let mut s = Self {
+        let c = Self {
             inner: Arc::new(Mutex::new(CanvasInner {
                 grid,
                 rectangle,
@@ -255,9 +255,8 @@ impl Canvas {
                 tuxel_receiver,
             })),
         };
-        s.draw_all().expect("enqueuing entire canvas rerender");
 
-        s
+        c
     }
 
     fn lock(&self) -> MutexGuard<CanvasInner> {
