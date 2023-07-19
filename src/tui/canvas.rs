@@ -513,8 +513,12 @@ impl Modifier {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::collections::BTreeSet;
+
     use rstest::*;
+
+    use super::super::geometry;
+    use super::*;
 
     #[rstest]
     #[case::base((5, 5))]
@@ -624,6 +628,152 @@ mod test {
             let cell = &inner.grid[idx.1][idx.0].lock().cells[idx.2];
             assert!(is_empty(cell));
         }
+
+        Ok(())
+    }
+
+    #[rstest]
+    #[case::base((50, 50), rectangle(0, 0, 0, 2, 2), (1, geometry::Direction::Down))]
+    fn validate_drawbuffer_translation_cleanup(
+        #[case] canvas_dims: (usize, usize),
+        #[case] initial_db_rect: Rectangle,
+        #[case] mv: (usize, geometry::Direction),
+    ) -> Result<()> {
+        let canvas = Canvas::new(canvas_dims.0, canvas_dims.1);
+
+        // verify blank canvas doesn't have any changed indices
+        let mut canvas_changed_idxs: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for stack in canvas.get_changed() {
+            canvas_changed_idxs.insert(stack.coordinates());
+        }
+        assert_eq!(
+            canvas_changed_idxs.iter().count(),
+            0,
+            "expected no changed indices, found:\n {:?}",
+            canvas_changed_idxs,
+        );
+
+        let mut dbuf = canvas.get_draw_buffer(initial_db_rect.clone())?;
+        let (dbuf_width, dbuf_height) = dbuf.rectangle().dimensions();
+
+        // verify creation of drawbuffer itself doesn't result in changed indices
+        let mut canvas_changed_idxs: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for stack in canvas.get_changed() {
+            canvas_changed_idxs.insert(stack.coordinates());
+        }
+        assert_eq!(
+            canvas_changed_idxs.iter().count(),
+            0,
+            "expected no changed indices, found:\n {:?}",
+            canvas_changed_idxs,
+        );
+
+        // fill drawbuffer so its tuxels are considered active
+        dbuf.fill('.')?;
+
+        {
+            // validate the number of changed indices from drawing
+            let mut canvas_changed_idxs: BTreeSet<(usize, usize)> = BTreeSet::new();
+            for stack in canvas.get_changed() {
+                canvas_changed_idxs.insert(stack.coordinates());
+            }
+            assert_eq!(
+                canvas_changed_idxs.iter().count(),
+                dbuf_width * dbuf_height,
+                "expected {} changed indices, found:\n {:?}",
+                dbuf_width * dbuf_height,
+                canvas_changed_idxs,
+            );
+        }
+
+        // verify there are no changed indicies without doing anything to the drawbuffer after
+        // running get_changed() above
+        let mut canvas_changed_idxs: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for stack in canvas.get_changed() {
+            canvas_changed_idxs.insert(stack.coordinates());
+        }
+        assert_eq!(
+            canvas_changed_idxs.iter().count(),
+            0,
+            "expected no changed indices, found:\n {:?}",
+            canvas_changed_idxs,
+        );
+
+        //  calculate the set of changed IDXs based on all the canvase indices touched by the
+        //  drawbuffer
+        let mut post_translation_rect = initial_db_rect.clone();
+        post_translation_rect.translate(mv.0, &mv.1)?;
+        let initial_rect_indices = initial_db_rect.into_iter();
+        let post_translation_rect_indices = post_translation_rect.into_iter();
+
+        let mut expected_changed_idxs: BTreeSet<(usize, usize)> = BTreeSet::new();
+        assert_eq!(
+            0,
+            expected_changed_idxs.iter().count(),
+            "expected {} changed indices, found:\n {:?}",
+            0,
+            canvas_changed_idxs,
+        );
+        for idx in initial_rect_indices {
+            expected_changed_idxs.insert((idx.0, idx.1));
+        }
+        assert_eq!(
+            (dbuf_width) * dbuf_height,
+            expected_changed_idxs.iter().count(),
+            "expected {} changed indices, found:\n {:?}",
+            (dbuf_width) * dbuf_height,
+            canvas_changed_idxs,
+        );
+
+        for idx in post_translation_rect_indices {
+            expected_changed_idxs.insert((idx.0, idx.1));
+        }
+
+        //  obtain set of changed IDXs from the canvas
+        dbuf.translate(mv.1)?;
+
+        let mut canvas_changed_idxs: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for stack in canvas.get_changed() {
+            canvas_changed_idxs.insert(stack.coordinates());
+        }
+        assert_eq!(
+            canvas_changed_idxs.iter().count(),
+            (dbuf_width + 1) * dbuf_height,
+            "expected {} changed indices, found:\n {:?}",
+            (dbuf_width + 1) * dbuf_height,
+            canvas_changed_idxs,
+        );
+
+        assert_eq!(
+            expected_changed_idxs.iter().count(),
+            (dbuf_width + 1) * dbuf_height,
+            "expected {} changed indices, found:\n {:?}",
+            (dbuf_width + 1) * dbuf_height,
+            canvas_changed_idxs,
+        );
+
+        let canvas_changed_idx_count = canvas_changed_idxs.iter().count();
+        let expected_changed_idx_count = expected_changed_idxs.iter().count();
+        assert_eq!(
+            expected_changed_idx_count, canvas_changed_idx_count,
+            "\nexpected:\n {:?}\nactual:\n {:?}",
+            expected_changed_idxs, canvas_changed_idxs
+        );
+
+        // use set logic to verify changed canvas IDXs
+        let only_in_canvas = canvas_changed_idxs.difference(&expected_changed_idxs);
+        let only_in_expected = expected_changed_idxs.difference(&canvas_changed_idxs);
+
+        assert!(
+            only_in_expected.clone().count() == 0,
+            "missing changed indices in the canvas {:?}",
+            &only_in_expected
+        );
+        assert!(
+            only_in_canvas.clone().count() == 0,
+            "found unexpected changed indices in the canvas {:?}",
+            &only_in_canvas
+        );
 
         Ok(())
     }

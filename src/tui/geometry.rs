@@ -68,6 +68,12 @@ impl Rectangle {
         self.1 .1
     }
 
+    #[cfg(test)]
+    #[inline(always)]
+    pub(crate) fn dimensions(&self) -> (usize, usize) {
+        (self.width(), self.height())
+    }
+
     #[inline(always)]
     pub(crate) fn x(&self) -> usize {
         self.0 .0
