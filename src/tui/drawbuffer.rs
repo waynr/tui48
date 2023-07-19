@@ -86,7 +86,6 @@ impl DrawBufferInner {
     fn get_tuxel_mut(&mut self, pos: Position) -> Result<&mut Tuxel> {
 
         let (x, y) = self.rectangle.relative_idx(&pos);
-        log::trace!("get_tuxel_mut: {0}, {1}", x, y);
         let t = self
             .buf
             .get_mut(y)
