@@ -889,7 +889,6 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                     self.renderer.clear(&self.canvas)?;
                 }
             }
-            self.canvas.draw_all()?;
         }
         Ok(())
     }
