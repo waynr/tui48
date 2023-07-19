@@ -207,7 +207,6 @@ impl DrawBufferInner {
 
     fn switch_layer(&mut self, zdx: usize) -> Result<()> {
         if self.rectangle.0 .2 == zdx {
-            // shh, don't tell the caller that we didn't have to do anything
             return Ok(());
         }
         log::trace!("switching layer from {0} to {1}", self.rectangle.z(), zdx);
