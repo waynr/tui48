@@ -235,6 +235,8 @@ impl std::fmt::Display for Direction {
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeSet;
+
     use super::*;
     use rstest::*;
 
@@ -295,6 +297,43 @@ mod test {
         let mut updated = initial.clone();
         updated.translate(magnitude, &direction)?;
         assert_eq!(expected, updated);
+        Ok(())
+    }
+
+    #[rstest]
+    #[case::simple(
+        rectangle(0, 0, 0, 2, 2),
+        BTreeSet::from([(0,0), (0,1), (1,0), (1,1)]),
+    )]
+    fn rectangle_to_indices(
+        #[case] rectangle: Rectangle,
+        #[case] expected_indices: BTreeSet<(usize, usize)>,
+    ) -> Result<()> {
+        let mut actual_indices: BTreeSet<(usize, usize)> = BTreeSet::new();
+
+        let rectangle_indices: Indices = rectangle.into();
+        for idx in rectangle_indices {
+            actual_indices.insert((idx.x(), idx.y()));
+        }
+
+        // use set logic to verify actual and expected indices are correct
+        let only_in_actual = actual_indices
+            .difference(&expected_indices)
+            .collect::<BTreeSet<_>>();
+        let only_in_expected = expected_indices
+            .difference(&actual_indices)
+            .collect::<BTreeSet<_>>();
+        assert!(
+            only_in_actual.len() == 0,
+            "\nFAILED BECAUSE - missing changed indices in the expected set:\n{:?}",
+            &only_in_actual
+        );
+        assert!(
+            only_in_expected.len() == 0,
+            "\nFAILED BECAUSE - missing changed indices in the actual set:\n{:?}",
+            &only_in_expected
+        );
+
         Ok(())
     }
 }
