@@ -1,7 +1,7 @@
 use super::error::{InnerError, Result};
 
 /// Idx encapsulates the x, y, and z coordinates of a Tuxel-based shape.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Ord, PartialOrd, PartialEq)]
 pub(crate) struct Idx(pub usize, pub usize, pub usize);
 
 impl std::fmt::Display for Idx {
@@ -152,47 +152,21 @@ pub(crate) enum Geometry<'a> {
     Rectangle(&'a Rectangle),
 }
 
-pub(crate) struct Indices {
-    from_x: usize,
-    current_x: usize,
-    to_x: usize,
-
-    current_y: usize,
-    to_y: usize,
-
-    z: usize,
-}
-
-impl From<Rectangle> for Indices {
-    fn from(r: Rectangle) -> Indices {
-        Indices {
-            z: r.z(),
-            from_x: r.x(),
-            current_x: r.x(),
-            current_y: r.y(),
-            to_x: r.x() + r.width() - 1,
-            to_y: r.y() + r.height() - 1,
-        }
-    }
-}
-
-impl Iterator for Indices {
+impl IntoIterator for Rectangle {
     type Item = Idx;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current_y > self.to_y {
-            None
-        } else if self.current_x < self.to_x {
-            let idx = Idx(self.current_x, self.current_y, self.z);
-            self.current_x += 1;
-            Some(idx)
-        } else if self.current_x == self.to_x && self.current_y <= self.to_y {
-            let idx = Idx(self.current_x, self.current_y, self.z);
-            self.current_x = self.from_x;
-            self.current_y += 1;
-            Some(idx)
-        } else {
-            unreachable!();
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let mut indices = Vec::new();
+        if self.width() == 0 || self.height() == 0 {
+            return indices.into_iter()
         }
+        for x in self.x()..(self.x() + self.width()) {
+            for y in self.y()..(self.y() + self.height()) {
+                indices.push(Idx(x, y, self.z()));
+            }
+        }
+        indices.into_iter()
     }
 }
 
@@ -301,19 +275,39 @@ mod test {
     }
 
     #[rstest]
-    #[case::simple(
+    #[case::zero(rectangle(0, 0, 0, 0, 0), BTreeSet::new())]
+    #[case::zerowidth(rectangle(0, 0, 0, 0, 1), BTreeSet::new())]
+    #[case::zeroheight(rectangle(0, 0, 0, 1, 0), BTreeSet::new())]
+    #[case::onebyone(
+        rectangle(0, 0, 0, 1, 1),
+        BTreeSet::from([Idx(0,0,0)]),
+    )]
+    #[case::twobytwo(
         rectangle(0, 0, 0, 2, 2),
-        BTreeSet::from([(0,0), (0,1), (1,0), (1,1)]),
+        BTreeSet::from([Idx(0,0,0), Idx(0,1,0), Idx(1,0,0), Idx(1,1,0)]),
+    )]
+    #[case::threebyfive(
+        rectangle(0, 0, 0, 3, 5),
+        BTreeSet::from([
+            Idx(0,0,0), Idx(1,0,0), Idx(2,0,0),
+            Idx(0,1,0), Idx(1,1,0), Idx(2,1,0),
+            Idx(0,2,0), Idx(1,2,0), Idx(2,2,0),
+            Idx(0,3,0), Idx(1,3,0), Idx(2,3,0),
+            Idx(0,4,0), Idx(1,4,0), Idx(2,4,0),
+        ]),
+    )]
+    #[case::nonorigin(
+        rectangle(999, 999, 0, 2, 2),
+        BTreeSet::from([Idx(999,999,0), Idx(999,1000,0), Idx(1000,999,0), Idx(1000,1000,0)]),
     )]
     fn rectangle_to_indices(
         #[case] rectangle: Rectangle,
-        #[case] expected_indices: BTreeSet<(usize, usize)>,
+        #[case] expected_indices: BTreeSet<Idx>,
     ) -> Result<()> {
-        let mut actual_indices: BTreeSet<(usize, usize)> = BTreeSet::new();
+        let mut actual_indices: BTreeSet<Idx> = BTreeSet::new();
 
-        let rectangle_indices: Indices = rectangle.into();
-        for idx in rectangle_indices {
-            actual_indices.insert((idx.x(), idx.y()));
+        for idx in rectangle.into_iter() {
+            actual_indices.insert(idx);
         }
 
         // use set logic to verify actual and expected indices are correct

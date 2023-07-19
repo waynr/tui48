@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use super::colors::Rgb;
 use super::drawbuffer::{DBTuxel, DrawBuffer};
 use super::error::{InnerError, Result, TuiError};
-use super::geometry::{Bounds2D, Geometry, Idx, Indices, Rectangle};
+use super::geometry::{Bounds2D, Geometry, Idx, Rectangle};
 use super::tuxel::Tuxel;
 
 const CANVAS_DEPTH: usize = 8;
@@ -178,8 +178,8 @@ impl CanvasInner {
             return Err(InnerError::RectangleDimensionsMustMatch.into());
         }
 
-        let rect1_indices: Indices = rect1.clone().into();
-        let rect2_indices: Indices = rect2.clone().into();
+        let rect1_indices = rect1.clone().into_iter();
+        let rect2_indices = rect2.clone().into_iter();
         log::trace!("swapping {0} and {1}", rect1, rect2);
         for (idx1, idx2) in rect1_indices.zip(rect2_indices) {
             self.swap_tuxels(idx1, idx2)?;
