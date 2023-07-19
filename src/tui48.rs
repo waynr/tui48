@@ -920,7 +920,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             let mut fc = 0;
             while tui_board.animate()? {
                 log::trace!("generated animation frame {0}\n{1}", fc, tui_board);
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                std::thread::sleep(std::time::Duration::from_millis(5));
                 self.renderer.render(&self.canvas)?;
                 log::trace!("rendered frame {} after sleeping 1ms", fc);
 
