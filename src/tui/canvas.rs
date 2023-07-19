@@ -335,13 +335,6 @@ impl Cell {
         }
     }
 
-    pub(crate) fn coordinates(&self) -> (usize, usize) {
-        match self {
-            Cell::DBTuxel(d) => d.coordinates(),
-            Cell::Empty => (0, 0),
-        }
-    }
-
     pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {
         match self {
             Cell::DBTuxel(d) => d.colors(),
@@ -449,11 +442,8 @@ impl Stack {
 
 impl Stack {
     pub(crate) fn coordinates(&self) -> (usize, usize) {
-        if let Some(idx) = self.top() {
-            self.lock().cells[idx].coordinates()
-        } else {
-            (0, 0)
-        }
+        let idx = self.lock().idx.clone();
+        (idx.x(), idx.y())
     }
 
     pub(crate) fn colors(&self) -> (Option<Rgb>, Option<Rgb>) {

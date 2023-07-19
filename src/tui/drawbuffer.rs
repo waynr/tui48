@@ -440,10 +440,6 @@ impl DBTuxel {
         self.lock().tuxel_is_active(self.buf_idx.0, self.buf_idx.1)
     }
 
-    pub(crate) fn coordinates(&self) -> (usize, usize) {
-        (self.canvas_idx.0, self.canvas_idx.1)
-    }
-
     pub(crate) fn set_canvas_idx(&mut self, new_idx: &Idx) -> Result<()> {
         self.canvas_idx = new_idx.clone();
         // NOTE: in the early stages of development the only case i can think of where this would
