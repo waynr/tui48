@@ -5,13 +5,13 @@ use crossterm::{
     cursor,
     event::{self, Event as CrossTermEvent, KeyCode, KeyEvent},
     style,
-    style::Color,
     terminal, ExecutableCommand, QueueableCommand,
 };
 
-use super::canvas::{Canvas, Modifier};
+use super::canvas::Canvas;
 use super::error::Result;
-use super::events::{Direction, Event, EventSource, UserInput};
+use super::events::{Event, EventSource, UserInput};
+use super::geometry::Direction;
 use super::renderer::Renderer;
 
 pub(crate) struct Crossterm<T: Write> {
@@ -31,11 +31,7 @@ impl<T: Write> Crossterm<T> {
 
 impl<T: Write> Drop for Crossterm<T> {
     fn drop(&mut self) {
-        self.w.execute(cursor::Show).expect("showing cursor again");
-        self.w
-            .execute(terminal::LeaveAlternateScreen)
-            .expect("leaving alternate screen");
-        terminal::disable_raw_mode().expect("disabling raw mode");
+        self.recover();
     }
 }
 
@@ -43,7 +39,7 @@ impl<T: Write> Renderer for Crossterm<T> {
     fn clear(&mut self, c: &Canvas) -> Result<()> {
         let (width, height) = c.dimensions();
         self.w
-            .queue(terminal::BeginSynchronizedUpdate)
+            .execute(terminal::BeginSynchronizedUpdate)
             .with_context(|| "queue synchronized update")?;
         self.w
             .queue(cursor::SavePosition)
@@ -62,7 +58,7 @@ impl<T: Write> Renderer for Crossterm<T> {
             .queue(cursor::RestorePosition)
             .with_context(|| "queue restore position")?;
         self.w
-            .queue(terminal::EndSynchronizedUpdate)
+            .execute(terminal::EndSynchronizedUpdate)
             .with_context(|| "queue end synchronized update")?;
         self.w.flush().with_context(|| "flush writer")?;
         Ok(())
@@ -70,70 +66,56 @@ impl<T: Write> Renderer for Crossterm<T> {
 
     fn render(&mut self, c: &Canvas) -> Result<()> {
         self.w
-            .queue(terminal::BeginSynchronizedUpdate)
-            .with_context(|| "queue synchronized update")?;
+            .execute(terminal::BeginSynchronizedUpdate)
+            .with_context(|| "execute synchronized update")?;
         self.w
-            .queue(cursor::SavePosition)
-            .with_context(|| "queue save cursor position")?;
-        for stack in c {
-            for command in stack.modifiers()?.iter() {
-                self.queue(command)
-                    .with_context(|| "queue tuxel modifier")?;
-            }
+            .execute(cursor::SavePosition)
+            .with_context(|| "execute save cursor position")?;
+        for stack in c.get_changed() {
+            let (fgcolor, bgcolor) = stack.colors();
+            let output = match stack.content() {
+                Some(c) => c,
+                None => continue,
+            };
             let (x, y) = stack.coordinates();
             self.w
-                .queue(cursor::MoveTo(x as u16, y as u16))
-                .with_context(|| "queue moving cursor")?;
+                .execute(cursor::MoveTo(x as u16, y as u16))
+                .with_context(|| "execute moving cursor")?;
+            if let Some(bg) = bgcolor {
+                self.w.execute(style::SetBackgroundColor(bg.into()))?;
+            }
+            if let Some(fg) = fgcolor {
+                self.w.execute(style::SetForegroundColor(fg.into()))?;
+            }
             self.w
-                .queue(style::Print(format!("{}", &stack)))
-                .with_context(|| "queue printing cell text")?;
+                .execute(style::Print(output))
+                .with_context(|| "execute printing cell text")?;
             self.w
-                .queue(style::ResetColor)
-                .with_context(|| "queue color reset")?;
+                .execute(style::ResetColor)
+                .with_context(|| "execute color reset")?;
             self.w
-                .queue(style::SetAttribute(style::Attribute::Reset))
-                .with_context(|| "queue attribute reset")?;
+                .execute(style::SetAttribute(style::Attribute::Reset))
+                .with_context(|| "execute attribute reset")?;
         }
         self.w
-            .queue(cursor::RestorePosition)
-            .with_context(|| "queue restore position")?;
+            .execute(cursor::RestorePosition)
+            .with_context(|| "execute restore position")?;
         self.w
-            .queue(terminal::EndSynchronizedUpdate)
-            .with_context(|| "queue end synchronized update")?;
-        self.w.flush().with_context(|| "flush writer")?;
+            .execute(terminal::EndSynchronizedUpdate)
+            .with_context(|| "execute end synchronized update")?;
         Ok(())
     }
 
     fn size_hint(&self) -> Result<(u16, u16)> {
         size()
     }
-}
 
-impl<T: Write> Crossterm<T> {
-    fn queue(&mut self, m: &Modifier) -> Result<()> {
-        match m {
-            Modifier::BackgroundColor(r, g, b) => self
-                .w
-                .queue(style::SetBackgroundColor(Color::Rgb {
-                    r: *r,
-                    g: *g,
-                    b: *b,
-                }))
-                .with_context(|| "queue setting background color")?,
-            Modifier::ForegroundColor(r, g, b) => self
-                .w
-                .queue(style::SetForegroundColor(Color::Rgb {
-                    r: *r,
-                    g: *g,
-                    b: *b,
-                }))
-                .with_context(|| "queue setting foreground color")?,
-            Modifier::Bold => self
-                .w
-                .queue(style::SetAttribute(style::Attribute::Bold))
-                .with_context(|| "queue setting bold attribute")?,
-        };
-        Ok(())
+    fn recover(&mut self) {
+        self.w.execute(cursor::Show).expect("showing cursor again");
+        self.w
+            .execute(terminal::LeaveAlternateScreen)
+            .expect("leaving alternate screen");
+        terminal::disable_raw_mode().expect("disabling raw mode");
     }
 }
 

@@ -1,29 +1,23 @@
-use rand::rngs::ThreadRng;
+use rand::RngCore;
 
 use super::round::{AnimationHint, Round, Score};
-
-/// Direction represents the direction indicated by the player.
-#[derive(Clone, Debug, Default)]
-pub(crate) enum Direction {
-    #[default]
-    Left,
-    Right,
-    Up,
-    Down,
-}
+use crate::tui::geometry::Direction;
 
 /// Board represents a 2048 board that keeps track of the history of its game states.
 pub(crate) struct Board {
-    rng: ThreadRng,
+    rng: Box<dyn RngCore>,
     rounds: Vec<Round>,
 }
 
 impl Board {
     /// Initialize new board using the given random number generator.
-    pub(crate) fn new(mut rng: ThreadRng) -> Self {
+    pub(crate) fn new(mut rng: impl RngCore + 'static) -> Self {
         let mut rounds = Vec::with_capacity(2000);
         rounds.push(Round::random(&mut rng));
-        Self { rng, rounds }
+        Self {
+            rng: Box::new(rng),
+            rounds,
+        }
     }
 
     pub(crate) fn score(&self) -> Score {
@@ -46,11 +40,21 @@ impl Board {
         hint
     }
 
-    pub(crate) fn current(&self) -> &Round {
-        self.rounds.last().expect("a board must always have at least one round")
+    pub(crate) fn current(&self) -> Round {
+        self.rounds
+            .last()
+            .expect("a board must always have at least one round")
+            .clone()
     }
 
     pub(crate) fn dimensions(&self) -> (usize, usize) {
         (4, 4)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_initial_round(&mut self, round: Round) {
+        let mut v = Vec::with_capacity(1);
+        v.push(round);
+        self.rounds = v;
     }
 }

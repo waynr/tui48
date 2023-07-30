@@ -11,6 +11,9 @@ pub(crate) enum Error {
     #[error("io error")]
     StdIOError(#[from] std::io::Error),
 
+    #[error("log error")]
+    LogError(#[from] log::SetLoggerError),
+
     #[error("{source:?}")]
     AnyhowError {
         #[from]
@@ -22,4 +25,16 @@ pub(crate) enum Error {
         #[from]
         source: crate::tui::error::TuiError,
     },
+
+    #[error("unable to retrieve drawbuffer: {context:?}")]
+    UnableToRetrieveSlot { context: String },
+
+    #[error("cannot convert slot to static tile slot")]
+    CannotConvertToStatic,
+
+    #[error("cannot convert {idx:?} to sliding tile slot")]
+    CannotConvertToSliding { idx: Option<crate::engine::round::Idx> },
+
+    #[error("terminal too small, required minimum size {0} x {1}")]
+    TerminalTooSmall(usize, usize),
 }

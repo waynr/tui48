@@ -3,30 +3,81 @@ use rand::distributions::WeightedIndex;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 
-use super::board::Direction;
+use crate::tui::geometry::Direction;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub(crate) struct Idx(pub(crate) usize, pub(crate) usize);
 
-#[derive(Default)]
+impl std::fmt::Display for Idx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ridx({0},{1})", self.0, self.1)
+    }
+}
+
+impl Idx {
+    pub(crate) fn x(&self) -> usize {
+        self.0
+    }
+
+    pub(crate) fn y(&self) -> usize {
+        self.1
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub(crate) enum Hint {
+    ToIdx(Idx),
+    NewValueToIdx(u16, Idx),
+    NewTile(u16, Direction),
+}
+
+impl std::fmt::Display for Hint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ToIdx(idx) => write!(f, "Hint::ToIdx({0})", idx),
+            Self::NewValueToIdx(value, idx) => {
+                write!(f, "Hint::NewValueToIdx({0}, {1})", value, idx)
+            }
+            Self::NewTile(value, direction) => {
+                write!(f, "Hint::NewTile({0}, {1})", value, direction)
+            }
+        }
+    }
+}
+
+#[derive(Default, PartialEq)]
 pub(crate) struct AnimationHint {
-    hint: [[Option<Idx>; 4]; 4],
+    hint: Vec<(Idx, Hint)>,
     changed: bool,
 }
 
+impl std::fmt::Display for AnimationHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.hint.len() > 0 {
+            write!(f, "\n")?;
+        }
+        for (idx, hint) in &self.hint {
+            write!(f, "  {0} - {1}\n", idx, hint)?;
+        }
+        Ok(())
+    }
+}
+
 impl AnimationHint {
-    fn get_mut(&mut self, idx: &Idx) -> &mut Option<Idx> {
-        self.hint
-            .get_mut(idx.1)
-            .expect(format!("invalid y coordinate {}", idx.1).as_str())
-            .get_mut(idx.0)
-            .expect(format!("invalid x coordinate {}", idx.0).as_str())
+    fn new() -> Self {
+        Self {
+            hint: Vec::new(),
+            changed: false,
+        }
     }
 
-    fn set(&mut self, idx: &Idx, value: Idx) {
+    fn set(&mut self, idx: &Idx, value: Hint) {
         self.changed = true;
-        let rf = self.get_mut(idx);
-        *rf = Some(value);
+        self.hint.push((idx.clone(), value));
+    }
+
+    pub(crate) fn hints(&self) -> Vec<(Idx, Hint)> {
+        self.hint.clone()
     }
 }
 
@@ -85,6 +136,62 @@ impl Round {
             .get(idx.0)
             .expect(format!("invalid x coordinate {}", idx.0).as_str())
     }
+
+    pub fn shift<T: Rng>(&mut self, mut rng: T, direction: &Direction) -> Option<AnimationHint> {
+        let mut hint = AnimationHint::new();
+        let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
+        let rows = idxs.chunks(4);
+        for row in rows {
+            let mut pivot_iter = row.iter();
+            let mut pivot_idx = pivot_iter.next().expect("should always yield an index");
+            let mut cmp_iter = pivot_iter.clone();
+            while let Some(cmp_idx) = cmp_iter.next() {
+                let pivot = self.get(pivot_idx);
+                let cmp = self.get(cmp_idx);
+                // if the cmp element is 0, move on to the next element in the row
+                if cmp == 0 {
+                    continue;
+                }
+                // if the pivot element is 0 and the cmp isn't, replace the pivot element with the
+                // cmp and zero the cmp
+                if pivot == 0 {
+                    self.set(pivot_idx, cmp);
+                    self.set(cmp_idx, 0);
+                    hint.set(cmp_idx, Hint::ToIdx(pivot_idx.clone()));
+                    continue;
+                }
+                // if the pivot element and the cmp element are equal then they must be combined;
+                // do so and increment the score by the value of the eliminated element
+                if pivot == cmp {
+                    let new_value = pivot + cmp;
+                    self.score += cmp;
+                    self.set(pivot_idx, pivot + cmp);
+                    self.set(cmp_idx, 0);
+                    hint.set(cmp_idx, Hint::NewValueToIdx(new_value, pivot_idx.clone()));
+                }
+                if let Some(idx) = pivot_iter.next() {
+                    pivot_idx = idx;
+                    cmp_iter = pivot_iter.clone();
+                } else {
+                    break; // no more pivots to test!
+                }
+            }
+        }
+        if hint.changed {
+            let idx = idxs
+                .chunks(4)
+                .map(|row| row.last().expect("all rows are expected to be populated"))
+                .filter(|idx| self.get(idx) == 0)
+                .choose(&mut rng)
+                .expect("all rows are populated and at least one row has changed");
+            let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(&mut rng)];
+            self.set(idx, new_value);
+            hint.set(idx, Hint::NewTile(new_value, direction.clone()));
+            Some(hint)
+        } else {
+            None
+        }
+    }
 }
 
 // private methods
@@ -106,58 +213,10 @@ impl Round {
         *rf = value;
     }
 
-    pub fn shift<T: Rng>(&mut self, mut rng: T, direction: &Direction) -> Option<AnimationHint> {
-        let mut hint = AnimationHint::default();
-        let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
-        let rows = idxs.chunks(4);
-        for row in rows {
-            let mut pivot_iter = row.iter();
-            let mut pivot_idx = pivot_iter.next().expect("should always yield an index");
-            let mut cmp_iter = pivot_iter.clone();
-            while let Some(cmp_idx) = cmp_iter.next() {
-                let pivot = self.get(pivot_idx);
-                let cmp = self.get(cmp_idx);
-                // if the cmp element is 0, move on to the next element in the row
-                if cmp == 0 {
-                    continue;
-                }
-                // if the pivot element is 0 and the cmp isn't, replace the pivot element with the
-                // cmp and zero the cmp
-                if pivot == 0 {
-                    self.set(pivot_idx, cmp);
-                    self.set(cmp_idx, 0);
-                    hint.set(cmp_idx, pivot_idx.clone());
-                    continue;
-                }
-                // if the pivot element and the cmp element are equal then they must be combined;
-                // do so and increment the score by the value of the eliminated element
-                if pivot == cmp {
-                    self.score += cmp;
-                    self.set(pivot_idx, pivot + cmp);
-                    self.set(cmp_idx, 0);
-                    hint.set(cmp_idx, pivot_idx.clone());
-                }
-                if let Some(idx) = pivot_iter.next() {
-                    pivot_idx = idx;
-                    cmp_iter = pivot_iter.clone();
-                } else {
-                    break; // no more pivots to test!
-                }
-            }
-        }
-        if hint.changed {
-            let idx = idxs
-                .chunks(4)
-                .map(|row| row.last().expect("all rows are expected to be populated"))
-                .filter(|idx| self.get(idx) == 0)
-                .choose(&mut rng)
-                .expect("all rows are populated and at least one row has changed");
-            let new_value = NEW_CARD_CHOICES[self.new_tile_weighted_index.sample(&mut rng)];
-            self.set(idx, new_value);
-            Some(hint)
-        } else {
-            None
-        }
+    #[cfg(test)]
+    pub(crate) fn set_value(&mut self, idx: &Idx, value: u16) {
+        let rf = self.get_mut(idx);
+        *rf = value;
     }
 }
 
@@ -261,9 +320,9 @@ impl Indices {
 
 #[cfg(test)]
 mod test {
-    use rstest::*;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
+    use rstest::*;
 
     use super::*;
     fn rng() -> SmallRng {
@@ -297,7 +356,7 @@ mod test {
         ] {
             let mut shifted = initial.clone();
             let mut rng = rng();
-            let hint = shifted.shift(&mut rng, &direction);
+            let _ = shifted.shift(&mut rng, &direction);
             assert_eq!(initial, shifted, "shifting {:?}", direction);
             assert_eq!(initial.score, shifted.score, "shifting {:?}", direction);
         }
@@ -366,7 +425,7 @@ mod test {
 
         let mut shifted = initial.clone();
         let mut rng = rng();
-        let hint = shifted.shift(&mut rng, &direction);
+        let _ = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 
@@ -419,7 +478,7 @@ mod test {
     fn combine(#[case] direction: Direction, #[case] initial: Round, #[case] expected: Round) {
         let mut shifted = initial.clone();
         let mut rng = rng();
-        let hint = shifted.shift(&mut rng, &direction);
+        let _ = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
     }
 }
