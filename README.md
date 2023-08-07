@@ -35,10 +35,10 @@ bugs on this git repo's issue tracker!
 
 ## Gameplay
 
-The object of the game is to repeatedly combine like tiles to produce the sum
-value. For example when if two `2` tiles are side-by-side and the player slides
-the board left or right then those two tiles combine into a `4`. Likewise, `4`
-and `4` produce `8`, `8` and `8` produce `16`, and so on.
+The object of the game is to repeatedly combine like tiles to produce their sum
+value. For example, if two `2` tiles are side-by-side and the player slides the
+board left or right then those two tiles combine into a `4`. Likewise, `4` and
+`4` produce `8`, `8` and `8` produce `16`, and so on.
 
 Each time a pair of tiles is combined, the pre-combination face value of those
 tiles is added to the score. For example, if `32` and `32` are combined the
@@ -49,7 +49,8 @@ the board are filled and slides are not possible in any direction because no
 two tiles with like value are adjacent to one another.
 
 The object of the game is to produce a tile with a value of `2048`, but `tui48`
-will allow the player to continue as far as they can to produce higher values.
+will allow the player to continue as far as they can to produce higher values
+-- `4096`, `8192`, etc.
 
 ### Controls
 
