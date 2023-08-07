@@ -1,6 +1,6 @@
 # tui48
 
-![](short-demo.gif)
+<img align="center" width="50%" height="50%" src="short-demo.gif">
 
 `tui48` is a clone of the popular single-player sliding tile puzzle video game
 orginally developed by Gabriele Cirulli. Instead using a GUI, it is a TUI
