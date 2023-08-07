@@ -246,7 +246,8 @@ impl Canvas {
             }
             grid.push(row);
         }
-        let (idx_sender, idx_receiver) = sync_channel(10000);
+
+        let (idx_sender, idx_receiver) = sync_channel(width*height*20);
         let (tuxel_sender, tuxel_receiver) = channel();
         let c = Self {
             inner: Arc::new(Mutex::new(CanvasInner {
