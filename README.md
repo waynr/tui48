@@ -3,9 +3,9 @@
 <img align="center" width="50%" height="50%" src="short-demo.gif">
 
 `tui48` is a clone of the popular single-player sliding tile puzzle video game
-orginally developed by Gabriele Cirulli. Instead using a GUI, it is a TUI
-appliation -- that is, a "Text User Interface" app meant to be run in tty-based
-[terminal emulator].
+orginally developed by Gabriele Cirulli. Instead of using a GUI, it is a TUI
+application -- that is, a "Text User Interface" app meant to be run in
+a [terminal emulator].
 
 I originally developed it after becoming dissatisfied with the poor
 responsiveness of a touchscreen implementation I was playing on a seatback
