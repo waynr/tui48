@@ -56,13 +56,13 @@ will allow the player to continue as far as they can to produce higher values.
 <dl>
   <dt>q</dt>
   <dd>Quit the current game and restore the terminal buffer to its pre-game state</dd>
-  <dt>h / \<left arrow\></dt>
+  <dt>h / left arrow</dt>
   <dd>slide tiles left</dd>
-  <dt>j / \<down arrow\></dt>
+  <dt>j / down arrow</dt>
   <dd>slide tiles down</dd>
-  <dt>k / \<up arrow\></dt>
+  <dt>k / up arrow</dt>
   <dd>slide tiles up</dd>
-  <dt>l / \<right arrow\></dt>
+  <dt>l / right arrow</dt>
   <dd>slide tiles right</dd>
 </dl>
 
