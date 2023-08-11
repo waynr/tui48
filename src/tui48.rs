@@ -73,21 +73,14 @@ const UPPER_ANIMATION_LAYER_IDX: usize = 5;
 
 impl Tui48Board {
     fn new(game: &Board, canvas: &mut Canvas) -> Result<Self> {
-        let board_rectangle = Rectangle(
-            Idx(BOARD_FIXED_X_OFFSET, BOARD_FIXED_Y_OFFSET, BOARD_LAYER_IDX),
-            Bounds2D(36, 25),
-        );
         let (cwidth, cheight) = canvas.dimensions();
-        let (x_extent, y_extent) = board_rectangle.extents();
-        if cwidth < x_extent || cheight < y_extent {
-            return Err(Error::TerminalTooSmall(cwidth, cheight).into());
-        }
+        let (board_rectangle, score_rectangle) = Self::get_validated_dimensions(cwidth, cheight)?;
 
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
         board.draw_border()?;
 
         let mut score =
-            canvas.get_draw_buffer(Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3)))?;
+            canvas.get_draw_buffer(score_rectangle)?;
         Self::draw_score(&mut score, game.score())?;
 
         let (width, height) = game.dimensions();
@@ -123,6 +116,30 @@ impl Tui48Board {
             done_slots: HashMap::new(),
             disappearing_slots: Vec::new(),
         })
+    }
+
+    fn get_validated_dimensions(canvas_width: usize, canvas_height: usize) -> Result<(Rectangle, Rectangle)> {
+        let board_rectangle = Self::board_rectangle();
+        let score_rectangle = Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3));
+
+        let combined_rectangle = &board_rectangle + &score_rectangle;
+        let (x_extent, y_extent) = combined_rectangle.extents();
+
+        if canvas_width < x_extent || canvas_height < y_extent {
+            return Err(Error::TerminalTooSmall(canvas_width, canvas_height).into());
+        }
+
+        Ok((board_rectangle, score_rectangle))
+    }
+
+    fn board_rectangle() -> Rectangle {
+        let x_bound: usize = 36;
+        let y_bound: usize = 25;
+
+        Rectangle(
+            Idx(BOARD_FIXED_X_OFFSET, BOARD_FIXED_Y_OFFSET, BOARD_LAYER_IDX),
+            Bounds2D(x_bound, y_bound),
+        )
     }
 
     fn tile_rectangle(x: usize, y: usize, z: usize) -> Rectangle {

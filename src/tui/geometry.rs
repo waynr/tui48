@@ -176,6 +176,23 @@ impl IntoIterator for Rectangle {
     }
 }
 
+impl std::ops::Add for &Rectangle {
+    type Output = Rectangle;
+    fn add(self, other: &Rectangle) -> Self::Output {
+        Rectangle(
+            Idx(
+                other.0.0,
+                other.0.1,
+                other.0.2,
+            ),
+            Bounds2D(
+                self.1.0 + other.1.0,
+                self.1.1 + other.1.1,
+            )
+        )
+    }
+}
+
 pub(crate) enum Position {
     TopLeft,
     TopRight,
