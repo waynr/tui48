@@ -941,6 +941,7 @@ mod test {
     use env_logger;
     use log::Log;
     use rand::SeedableRng;
+    use rstest::*;
 
     use super::*;
     use crate::engine::round::Round;
@@ -998,7 +999,6 @@ mod test {
         init()?;
 
         let logger = env_logger::Logger::from_default_env();
-        logger.log(&debug(format_args!("meow42")));
 
         let idxs = HashMap::from([(BoardIdx(0, 0), 2), (BoardIdx(0, 1), 2)]);
         let (mut game_board, canvas, mut tui_board) = setup(100, 100, idxs)?;
@@ -1063,13 +1063,53 @@ mod test {
                 tui_board.done_slots.len()
             )));
         }
-
         tui_board.teardown_animation()?;
         assert_eq!(tui_board.moving_slots.len(), 0);
         assert_eq!(tui_board.done_slots.len(), 0);
         assert_eq!(tui_board.disappearing_slots.len(), 0);
         verify_occupied_layers(&canvas, vec![2, 4], vec![0, 1, 3, 5, 6, 7]);
         // TODO: verify canvas after teardown
+
+        Ok(())
+    }
+
+    #[rstest]
+    #[case::zero(0, 0)]
+    #[case::small(10, 10)]
+    #[case::height_too_small(100, 24)]
+    #[case::width_too_small(40, 100)]
+    fn error_if_terminal_is_too_small(#[case] width: usize, #[case] height: usize) -> Result<()> {
+        init()?;
+
+        let idxs = HashMap::from([(BoardIdx(0, 0), 2), (BoardIdx(0, 1), 2)]);
+        let r = setup(width, height, idxs);
+        assert!(r.is_err());
+        Ok(())
+    }
+
+    #[rstest]
+    #[case::top(Direction::Down)]
+    #[case::bottom(Direction::Up)]
+    #[case::left(Direction::Right)]
+    #[case::right(Direction::Left)]
+    fn verify_board_bounds_within_canvas(
+        #[case] slide_dir: Direction,
+    ) -> Result<()> {
+        init()?;
+
+        let idxs = HashMap::from([(BoardIdx(1, 1), 2), (BoardIdx(2, 2), 2)]);
+        let rect = Tui48Board::board_rectangle();
+        let (x_extent, y_extent) = rect.extents();
+        let (mut game_board, _, mut tui_board) = setup(x_extent, y_extent, idxs)?;
+
+        let hint = game_board
+            .shift(slide_dir.clone())
+            .expect(format!("{:?} slide should result in hints", slide_dir).as_str());
+
+        Tui48Board::draw_score(&mut tui_board.score, game_board.score())?;
+        tui_board.setup_animation(hint)?;
+        while tui_board.animate()? {}
+        tui_board.teardown_animation()?;
 
         Ok(())
     }
