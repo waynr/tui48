@@ -165,7 +165,7 @@ impl IntoIterator for Rectangle {
     fn into_iter(self) -> Self::IntoIter {
         let mut indices = Vec::new();
         if self.width() == 0 || self.height() == 0 {
-            return indices.into_iter()
+            return indices.into_iter();
         }
         for x in self.x()..(self.x() + self.width()) {
             for y in self.y()..(self.y() + self.height()) {
@@ -180,15 +180,8 @@ impl std::ops::Add for &Rectangle {
     type Output = Rectangle;
     fn add(self, other: &Rectangle) -> Self::Output {
         Rectangle(
-            Idx(
-                other.0.0,
-                other.0.1,
-                other.0.2,
-            ),
-            Bounds2D(
-                self.1.0 + other.1.0,
-                self.1.1 + other.1.1,
-            )
+            Idx(other.0 .0, other.0 .1, other.0 .2),
+            Bounds2D(self.1 .0 + other.1 .0, self.1 .1 + other.1 .1),
         )
     }
 }
