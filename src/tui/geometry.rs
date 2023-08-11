@@ -151,6 +151,27 @@ impl Rectangle {
             }
         }
     }
+
+    #[inline(always)]
+    pub(crate) fn expand_by(&self, margin: usize) -> Rectangle {
+        let (x, width) = if self.0 .0 >= margin {
+            (self.0 .0 - margin, self.1 .0 + margin * 2)
+        } else if self.0 .0 == 0 {
+            (0, self.1 .0 + margin - self.0 .0 + margin)
+        } else {
+            (0, self.1 .0 + margin * 2)
+        };
+
+        let (y, height) = if self.0 .1 >= margin {
+            (self.0 .1 - margin, self.1 .1 + margin * 2)
+        } else if self.0 .1 == 0 {
+            (0, self.1 .1 + margin - self.0 .1 + margin)
+        } else {
+            (0, self.1 .1 + margin * 2)
+        };
+
+        Rectangle(Idx(x, y, self.0 .2), Bounds2D(width, height))
+    }
 }
 
 pub(crate) enum Geometry<'a> {
@@ -345,5 +366,39 @@ mod test {
         );
 
         Ok(())
+    }
+
+    #[rstest]
+    #[case::zero_rectangle_at_origin(rectangle(0, 0, 0, 0, 0), 0, rectangle(0, 0, 0, 0, 0))]
+    #[case::zero_rectangle_away_from_origin(
+        rectangle(10, 10, 0, 0, 0),
+        0,
+        rectangle(10, 10, 0, 0, 0)
+    )]
+    #[case::zero_at_origin_expand_by_1(rectangle(0, 0, 0, 0, 0), 1, rectangle(0, 0, 0, 2, 2))]
+    #[case::zero_at_origin_expand_by_5(rectangle(0, 0, 0, 0, 0), 5, rectangle(0, 0, 0, 10, 10))]
+    #[case::zero_away_from_origin_expand_by_1(
+        rectangle(10, 10, 0, 0, 0),
+        1,
+        rectangle(9, 9, 0, 2, 2)
+    )]
+    #[case::zero_away_from_origin_expand_by_5(
+        rectangle(10, 10, 0, 0, 0),
+        5,
+        rectangle(5, 5, 0, 10, 10)
+    )]
+    #[case::zero_near_origin_expand_by_5(rectangle(3, 3, 0, 0, 0), 5, rectangle(0, 0, 0, 10, 10))]
+    #[case::at_origin_expand_by_1(rectangle(0, 0, 0, 2, 2), 1, rectangle(0, 0, 0, 4, 4))]
+    #[case::at_origin_expand_by_5(rectangle(0, 0, 0, 2, 2), 5, rectangle(0, 0, 0, 12, 12))]
+    #[case::away_from_origin_expand_by_1(rectangle(10, 10, 0, 2, 2), 1, rectangle(9, 9, 0, 4, 4))]
+    #[case::away_from_origin_expand_by_5(rectangle(10, 10, 0, 2, 2), 5, rectangle(5, 5, 0, 12, 12))]
+    #[case::near_origin_expand_by_5(rectangle(3, 3, 0, 3, 3), 5, rectangle(0, 0, 0, 13, 13))]
+    fn validate_expand_by(
+        #[case] initial: Rectangle,
+        #[case] margin: usize,
+        #[case] expected: Rectangle,
+    ) {
+        let actual = initial.expand_by(margin);
+        assert_eq!(actual, expected);
     }
 }
