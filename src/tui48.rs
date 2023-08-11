@@ -121,8 +121,9 @@ impl Tui48Board {
     fn get_validated_dimensions(canvas_width: usize, canvas_height: usize) -> Result<(Rectangle, Rectangle)> {
         let board_rectangle = Self::board_rectangle();
         let score_rectangle = Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3));
+        let board_rectangle_with_tile_start = board_rectangle.expand_by(3);
 
-        let combined_rectangle = &board_rectangle + &score_rectangle;
+        let combined_rectangle = &board_rectangle_with_tile_start + &score_rectangle;
         let (x_extent, y_extent) = combined_rectangle.extents();
 
         if canvas_width < x_extent || canvas_height < y_extent {
