@@ -50,15 +50,6 @@ impl CanvasInner {
         self.get_draw_buffer(c, Rectangle(Idx(0, 0, z), self.rectangle.1.clone()))
     }
 
-    fn draw_all(&mut self) -> Result<()> {
-        for row in self.grid.iter_mut() {
-            for stack in row.iter_mut() {
-                self.idx_sender.send(stack.lock().idx.clone())?
-            }
-        }
-        Ok(())
-    }
-
     fn dimensions(&self) -> (usize, usize) {
         (self.rectangle.1 .0, self.rectangle.1 .1)
     }
@@ -277,10 +268,6 @@ impl Canvas {
     pub(crate) fn get_layer(&self, z: usize) -> Result<DrawBuffer> {
         let c = self.clone();
         self.lock().get_layer(c, z)
-    }
-
-    fn draw_all(&mut self) -> Result<()> {
-        self.lock().draw_all()
     }
 
     pub(crate) fn bounds(&self) -> Bounds2D {
