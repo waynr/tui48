@@ -61,10 +61,12 @@ struct Tui48Board {
 const BOARD_FIXED_Y_OFFSET: usize = 5;
 const BOARD_FIXED_X_OFFSET: usize = 5;
 const BOARD_BORDER_WIDTH: usize = 1;
-const BOARD_X_PADDING: usize = 2;
+const BOARD_X_PADDING: usize = 1;
 const BOARD_Y_PADDING: usize = 1;
 const TILE_HEIGHT: usize = 5;
 const TILE_WIDTH: usize = 6;
+const NEW_TILE_HORIZONTAL_OFFSET: usize = 4;
+const NEW_TILE_VERTICAL_OFFSET: usize = 4;
 
 const BOARD_LAYER_IDX: usize = 2;
 const LOWER_ANIMATION_LAYER_IDX: usize = 3;
@@ -79,8 +81,7 @@ impl Tui48Board {
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
         board.draw_border()?;
 
-        let mut score =
-            canvas.get_draw_buffer(score_rectangle)?;
+        let mut score = canvas.get_draw_buffer(score_rectangle)?;
         Self::draw_score(&mut score, game.score())?;
 
         let (width, height) = game.dimensions();
@@ -118,10 +119,14 @@ impl Tui48Board {
         })
     }
 
-    fn get_validated_dimensions(canvas_width: usize, canvas_height: usize) -> Result<(Rectangle, Rectangle)> {
+    fn get_validated_dimensions(
+        canvas_width: usize,
+        canvas_height: usize,
+    ) -> Result<(Rectangle, Rectangle)> {
         let board_rectangle = Self::board_rectangle();
         let score_rectangle = Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3));
-        let board_rectangle_with_tile_start = board_rectangle.expand_by(3);
+        let board_rectangle_with_tile_start =
+            board_rectangle.expand_by(NEW_TILE_HORIZONTAL_OFFSET, NEW_TILE_VERTICAL_OFFSET);
 
         let combined_rectangle = &board_rectangle_with_tile_start + &score_rectangle;
         let (x_extent, y_extent) = combined_rectangle.extents();
@@ -133,9 +138,21 @@ impl Tui48Board {
         Ok((board_rectangle, score_rectangle))
     }
 
+    #[cfg(test)]
+    fn get_minimum_canvas_dimensions() -> (usize, usize) {
+        let board_rectangle = Self::board_rectangle();
+        let score_rectangle = Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3));
+        let board_rectangle_with_tile_start =
+            board_rectangle.expand_by(NEW_TILE_HORIZONTAL_OFFSET, NEW_TILE_VERTICAL_OFFSET);
+
+        let combined_rectangle = &board_rectangle_with_tile_start + &score_rectangle;
+
+        combined_rectangle.extents()
+    }
+
     fn board_rectangle() -> Rectangle {
-        let x_bound: usize = 36;
-        let y_bound: usize = 25;
+        let x_bound: usize = TILE_WIDTH * 4 + BOARD_FIXED_X_OFFSET + BOARD_BORDER_WIDTH * 2;
+        let y_bound: usize = TILE_HEIGHT * 4 + BOARD_FIXED_Y_OFFSET;
 
         Rectangle(
             Idx(BOARD_FIXED_X_OFFSET, BOARD_FIXED_Y_OFFSET, BOARD_LAYER_IDX),
@@ -144,7 +161,7 @@ impl Tui48Board {
     }
 
     fn tile_rectangle(x: usize, y: usize, z: usize) -> Rectangle {
-        let x_offset = BOARD_FIXED_X_OFFSET + BOARD_BORDER_WIDTH + BOARD_X_PADDING;
+        let x_offset = BOARD_FIXED_X_OFFSET + BOARD_BORDER_WIDTH * 2;
         let y_offset = BOARD_FIXED_Y_OFFSET + BOARD_BORDER_WIDTH;
         let idx = Idx(
             x_offset + (BOARD_X_PADDING + TILE_WIDTH) * x,
@@ -214,22 +231,23 @@ impl Tui48Board {
     ) -> Result<SlidingTile> {
         let db_rectangle = match direction {
             Direction::Left => {
-                let r = Tui48Board::tile_rectangle(4, to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
+                let mut r = Tui48Board::tile_rectangle(3, to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
+                r.0 .0 += NEW_TILE_HORIZONTAL_OFFSET;
                 r
             }
             Direction::Right => {
                 let mut r = Tui48Board::tile_rectangle(0, to_idx.y(), LOWER_ANIMATION_LAYER_IDX);
-                r.0 .0 -= 6;
+                r.0 .0 -= NEW_TILE_HORIZONTAL_OFFSET;
                 r
             }
             Direction::Up => {
-                let mut r = Tui48Board::tile_rectangle(to_idx.x(), 4, LOWER_ANIMATION_LAYER_IDX);
-                r.0 .1 -= 2;
+                let mut r = Tui48Board::tile_rectangle(to_idx.x(), 3, LOWER_ANIMATION_LAYER_IDX);
+                r.0 .1 += NEW_TILE_VERTICAL_OFFSET;
                 r
             }
             Direction::Down => {
                 let mut r = Tui48Board::tile_rectangle(to_idx.x(), 0, LOWER_ANIMATION_LAYER_IDX);
-                r.0 .1 -= 6;
+                r.0 .1 -= NEW_TILE_VERTICAL_OFFSET;
                 r
             }
         };
@@ -1110,24 +1128,24 @@ mod test {
     #[case::bottom(Direction::Up)]
     #[case::left(Direction::Right)]
     #[case::right(Direction::Left)]
-    fn verify_board_bounds_within_canvas(
-        #[case] slide_dir: Direction,
-    ) -> Result<()> {
+    fn verify_board_bounds_within_canvas(#[case] slide_dir: Direction) -> Result<()> {
         init()?;
 
         let idxs = HashMap::from([(BoardIdx(1, 1), 2), (BoardIdx(2, 2), 2)]);
-        let rect = Tui48Board::board_rectangle();
-        let (x_extent, y_extent) = rect.extents();
+        let (x_extent, y_extent) = Tui48Board::get_minimum_canvas_dimensions();
         let (mut game_board, _, mut tui_board) = setup(x_extent, y_extent, idxs)?;
 
         let hint = game_board
             .shift(slide_dir.clone())
             .expect(format!("{:?} slide should result in hints", slide_dir).as_str());
 
-        Tui48Board::draw_score(&mut tui_board.score, game_board.score())?;
-        tui_board.setup_animation(hint)?;
+        let r = Tui48Board::draw_score(&mut tui_board.score, game_board.score());
+        assert!(r.is_ok());
+        let r = tui_board.setup_animation(hint);
+        assert!(r.is_ok());
         while tui_board.animate()? {}
-        tui_board.teardown_animation()?;
+        let r = tui_board.teardown_animation();
+        assert!(r.is_ok());
 
         Ok(())
     }
