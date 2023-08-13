@@ -50,7 +50,7 @@ use crate::tui::renderer::Renderer;
 ///
 struct Tui48Board {
     canvas: Canvas,
-    _board: DrawBuffer,
+    board: DrawBuffer,
     score: DrawBuffer,
     slots: Vec<Vec<Slot>>,
     disappearing_slots: Vec<Slot>,
@@ -75,8 +75,7 @@ const UPPER_ANIMATION_LAYER_IDX: usize = 5;
 
 impl Tui48Board {
     fn new(game: &Board, canvas: &mut Canvas) -> Result<Self> {
-        let (cwidth, cheight) = canvas.dimensions();
-        let (board_rectangle, score_rectangle) = Self::get_validated_dimensions(cwidth, cheight)?;
+        let (board_rectangle, score_rectangle) = Self::get_dimensions();
 
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
         board.draw_border()?;
@@ -110,7 +109,7 @@ impl Tui48Board {
         board.modify(Modifier::SetFGLightness(0.6));
         Ok(Self {
             canvas: canvas.clone(),
-            _board: board,
+            board: board,
             score,
             slots,
             moving_slots: Vec::new(),
@@ -119,29 +118,33 @@ impl Tui48Board {
         })
     }
 
-    fn get_validated_dimensions(
-        canvas_width: usize,
-        canvas_height: usize,
-    ) -> Result<(Rectangle, Rectangle)> {
+    fn get_dimensions() -> (Rectangle, Rectangle) {
         let board_rectangle = Self::board_rectangle();
         let score_rectangle = Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3));
-        let board_rectangle_with_tile_start =
-            board_rectangle.expand_by(NEW_TILE_HORIZONTAL_OFFSET, NEW_TILE_VERTICAL_OFFSET);
 
-        let combined_rectangle = &board_rectangle_with_tile_start + &score_rectangle;
+        (board_rectangle, score_rectangle)
+    }
+
+    fn check_bounds(&self) -> Result<()> {
+        let board_rectangle_with_tile_start = self
+            .board
+            .rectangle()
+            .expand_by(NEW_TILE_HORIZONTAL_OFFSET, NEW_TILE_VERTICAL_OFFSET);
+
+        let combined_rectangle = &board_rectangle_with_tile_start + &self.score.rectangle();
         let (x_extent, y_extent) = combined_rectangle.extents();
 
-        if canvas_width < x_extent || canvas_height < y_extent {
-            return Err(Error::TerminalTooSmall(canvas_width, canvas_height).into());
+        let (cwidth, cheight) = self.canvas.dimensions();
+        if cwidth < x_extent || cheight < y_extent {
+            return Err(Error::TerminalTooSmall(cwidth, cheight).into());
         }
 
-        Ok((board_rectangle, score_rectangle))
+        Ok(())
     }
 
     #[cfg(test)]
-    fn get_minimum_canvas_dimensions() -> (usize, usize) {
-        let board_rectangle = Self::board_rectangle();
-        let score_rectangle = Rectangle(Idx(18, 1, BOARD_LAYER_IDX), Bounds2D(10, 3));
+    fn get_minimum_canvas_extents() -> (usize, usize) {
+        let (board_rectangle, score_rectangle) = Self::get_dimensions();
         let board_rectangle_with_tile_start =
             board_rectangle.expand_by(NEW_TILE_HORIZONTAL_OFFSET, NEW_TILE_VERTICAL_OFFSET);
 
@@ -939,6 +942,9 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             Err(Error::TerminalTooSmall(_, _)) => None,
             Err(e) => return Err(e),
         };
+        if let Some(tui_board) = &self.tui_board {
+            tui_board.check_bounds()?;
+        }
         Ok(())
     }
 
@@ -1113,8 +1119,11 @@ mod test {
     #[case::zero(0, 0)]
     #[case::small(10, 10)]
     #[case::height_too_small(100, 24)]
-    #[case::width_too_small(40, 100)]
-    fn error_if_terminal_is_too_small(#[case] width: usize, #[case] height: usize) -> Result<()> {
+    #[case::width_too_small(35, 100)]
+    fn check_bounds_error_if_terminal_is_too_small_for_board(
+        #[case] width: usize,
+        #[case] height: usize,
+    ) -> Result<()> {
         init()?;
 
         let idxs = HashMap::from([(BoardIdx(0, 0), 2), (BoardIdx(0, 1), 2)]);
@@ -1124,15 +1133,53 @@ mod test {
     }
 
     #[rstest]
+    fn check_bounds_width_animation_errors(
+        // TODO: try submitting feature to rstest to so we can do something like 
+        // #[range(36usize..66)]
+        #[values(
+            36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+            58, 59, 60, 61, 62, 63, 64, 65, 66
+        )]
+        width: usize,
+    ) -> Result<()> {
+        init()?;
+        let height = 100usize;
+
+        let idxs = HashMap::from([(BoardIdx(0, 0), 2), (BoardIdx(0, 1), 2)]);
+        let r = setup(width, height, idxs);
+        assert!(r.is_ok());
+        let (_board, _canvas, tui48_board) = r.unwrap();
+        let r = tui48_board.check_bounds();
+        assert!(r.is_err());
+        Ok(())
+    }
+
+    #[rstest]
+    fn check_bounds_height_animation_errors(
+        #[values(30, 31, 32, 33, 34, 35, 36)] height: usize,
+    ) -> Result<()> {
+        init()?;
+        let width = 100usize;
+
+        let idxs = HashMap::from([(BoardIdx(0, 0), 2), (BoardIdx(0, 1), 2)]);
+        let r = setup(width, height, idxs);
+        assert!(r.is_ok());
+        let (_board, _canvas, tui48_board) = r.unwrap();
+        let r = tui48_board.check_bounds();
+        assert!(r.is_err());
+        Ok(())
+    }
+
+    #[rstest]
     #[case::top(Direction::Down)]
     #[case::bottom(Direction::Up)]
     #[case::left(Direction::Right)]
     #[case::right(Direction::Left)]
-    fn verify_board_bounds_within_canvas(#[case] slide_dir: Direction) -> Result<()> {
+    fn check_bounds_animation(#[case] slide_dir: Direction) -> Result<()> {
         init()?;
 
         let idxs = HashMap::from([(BoardIdx(1, 1), 2), (BoardIdx(2, 2), 2)]);
-        let (x_extent, y_extent) = Tui48Board::get_minimum_canvas_dimensions();
+        let (x_extent, y_extent) = Tui48Board::get_minimum_canvas_extents();
         let (mut game_board, _, mut tui_board) = setup(x_extent, y_extent, idxs)?;
 
         let hint = game_board
