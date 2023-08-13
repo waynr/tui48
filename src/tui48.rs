@@ -266,7 +266,7 @@ impl Tui48Board {
         Ok(st)
     }
 
-    fn setup_animation(&mut self, hints: AnimationHint) -> Result<()> {
+    fn setup_animation(&mut self, hints: &AnimationHint) -> Result<()> {
         log::trace!("setting up animation with hints:\n{0}", hints);
         for (idx, hint) in hints.hints() {
             log::trace!("setting up animation for hint {0} -> {1}", idx, hint);
@@ -889,17 +889,30 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     }
 
     pub(crate) fn run(mut self) -> Result<()> {
-        match self.inner_run() {
-            Err(e) => {
-                self.renderer.recover();
-                Err(e)
+        let mut state = GameState::Active;
+        loop {
+            state = match state {
+                GameState::Quit => return Ok(()),
+                GameState::Active => match self.run_game_active() {
+                    Err(e) => {
+                        self.renderer.recover();
+                        return Err(e);
+                    }
+                    Ok(state) => state,
+                },
+                GameState::Over => match self.run_game_over() {
+                    Err(e) => {
+                        self.renderer.recover();
+                        return Err(e);
+                    }
+                    Ok(state) => state,
+                },
             }
-            Ok(_) => Ok(()),
         }
     }
 
     /// Run consumes the Tui48 instance and takes control of the terminal to begin gameplay.
-    pub(crate) fn inner_run(&mut self) -> Result<()> {
+    fn run_game_active(&mut self) -> Result<GameState> {
         self.resize()?;
 
         loop {
@@ -915,7 +928,12 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             self.renderer.render(&self.canvas)?;
             log::trace!("rendered, waiting for input");
             match self.event_source.next_event()? {
-                Event::UserInput(UserInput::Direction(d)) => self.shift(d)?,
+                Event::UserInput(UserInput::Direction(d)) => {
+                    let game_over = self.shift(d)?;
+                    if game_over {
+                        return Ok(GameState::Over);
+                    }
+                }
                 Event::UserInput(UserInput::Quit) => break,
                 Event::Resize => {
                     self.resize()?;
@@ -929,11 +947,13 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                 }
             }
         }
-        Ok(())
+        Ok(GameState::Quit)
     }
-}
 
-impl<R: Renderer, E: EventSource> Tui48<R, E> {
+    fn run_game_over(&mut self) -> Result<GameState> {
+        Ok(GameState::Active)
+    }
+
     fn resize(&mut self) -> Result<()> {
         let (width, height) = self.renderer.size_hint()?;
         self.canvas = Canvas::new(width as usize, height as usize);
@@ -948,7 +968,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         Ok(())
     }
 
-    fn shift(&mut self, direction: Direction) -> Result<()> {
+    fn shift(&mut self, direction: Direction) -> Result<bool> {
         if let Some(hint) = self.board.shift(direction) {
             let mut tui_board = self
                 .tui_board
@@ -957,7 +977,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             Tui48Board::draw_score(&mut tui_board.score, self.board.score())?;
             log::trace!("Tui48Board prior to setting up animation\n{}", tui_board);
             log::trace!("Canvas prior to setting up animation\n{}", self.canvas);
-            tui_board.setup_animation(hint)?;
+            tui_board.setup_animation(&hint)?;
             log::trace!("after setting up animation\n{}", tui_board);
             let mut fc = 0;
             while tui_board.animate()? {
@@ -971,9 +991,18 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             tui_board.teardown_animation()?;
             self.renderer.render(&self.canvas)?;
             let _ = self.tui_board.replace(tui_board);
+            if hint.game_over() {
+                return Ok(true);
+            }
         }
-        Ok(())
+        Ok(false)
     }
+}
+
+enum GameState {
+    Active,
+    Over,
+    Quit,
 }
 
 #[cfg(test)]
@@ -1063,7 +1092,7 @@ mod test {
         assert!(matches!(hint3, Hint::NewTile(2, Direction::Down)));
 
         verify_occupied_layers(&canvas, vec![2, 4], vec![0, 1, 3, 5, 6, 7]);
-        tui_board.setup_animation(hint)?;
+        tui_board.setup_animation(&hint)?;
         verify_occupied_layers(&canvas, vec![2, 3, 5], vec![0, 1, 4, 6, 7]);
 
         // TODO: verify board after setup
@@ -1134,7 +1163,7 @@ mod test {
 
     #[rstest]
     fn check_bounds_width_animation_errors(
-        // TODO: try submitting feature to rstest to so we can do something like 
+        // TODO: try submitting feature to rstest to so we can do something like
         // #[range(36usize..66)]
         #[values(
             36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
@@ -1188,7 +1217,7 @@ mod test {
 
         let r = Tui48Board::draw_score(&mut tui_board.score, game_board.score());
         assert!(r.is_ok());
-        let r = tui_board.setup_animation(hint);
+        let r = tui_board.setup_animation(&hint);
         assert!(r.is_ok());
         while tui_board.animate()? {}
         let r = tui_board.teardown_animation();

@@ -81,6 +81,10 @@ impl AnimationHint {
     pub(crate) fn hints(&self) -> Vec<(Idx, Hint)> {
         self.hint.clone()
     }
+
+    pub(crate) fn game_over(&self) -> bool {
+        self.game_over
+    }
 }
 
 pub(crate) type Card = u16;
