@@ -49,6 +49,7 @@ impl std::fmt::Display for Hint {
 pub(crate) struct AnimationHint {
     hint: Vec<(Idx, Hint)>,
     changed: bool,
+    game_over: bool,
 }
 
 impl std::fmt::Display for AnimationHint {
@@ -68,6 +69,7 @@ impl AnimationHint {
         Self {
             hint: Vec::new(),
             changed: false,
+            game_over: false,
         }
     }
 
@@ -139,7 +141,7 @@ impl Round {
 
     pub fn shift<T: Rng>(&mut self, mut rng: T, direction: &Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::new();
-        let idxs = self.iter_mut(direction.clone()).collect::<Vec<Idx>>();
+        let idxs = self.iter_mut(direction).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
         for row in rows {
             let mut pivot_iter = row.iter();
@@ -178,6 +180,7 @@ impl Round {
             }
         }
         if hint.changed {
+            hint.game_over = self.is_game_over(&direction);
             let idx = idxs
                 .chunks(4)
                 .map(|row| row.last().expect("all rows are expected to be populated"))
@@ -196,8 +199,8 @@ impl Round {
 
 // private methods
 impl Round {
-    fn iter_mut(&self, direction: Direction) -> Indices {
-        Indices::new(self, direction)
+    fn iter_mut(&self, direction: &Direction) -> Indices {
+        Indices::new(self, direction.clone())
     }
 
     fn get_mut(&mut self, idx: &Idx) -> &mut Card {
@@ -211,6 +214,10 @@ impl Round {
     fn set(&mut self, idx: &Idx, value: Card) {
         let rf = self.get_mut(idx);
         *rf = value;
+    }
+
+    fn is_game_over(&self, direction_hint: &Direction) -> bool {
+        self.iter_mut(direction_hint).find(|v| self.get(&v) == 0).is_none()
     }
 
     #[cfg(test)]
@@ -480,5 +487,27 @@ mod test {
         let mut rng = rng();
         let _ = shifted.shift(&mut rng, &direction);
         assert_eq!(shifted, expected, "shifting {:?}", direction);
+    }
+
+    #[rstest]
+    #[case::slide_up(Direction::Up)]
+    #[case::slide_down(Direction::Down)]
+    #[case::slide_left(Direction::Left)]
+    #[case::slide_right(Direction::Right)]
+    fn validate_game_over(#[case] direction: Direction) {
+        let initial = round(
+            [
+                [8, 16, 32, 64],
+                [64, 0, 16, 8],
+                [8, 16, 32, 64],
+                [64, 32, 16, 8],
+            ],
+            0,
+        );
+        let mut shifted = initial.clone();
+        let mut rng = rng();
+        let hint = shifted.shift(&mut rng, &direction);
+        assert!(hint.is_some());
+        assert_eq!(hint.unwrap().game_over, false);
     }
 }
