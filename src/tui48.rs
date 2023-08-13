@@ -10,6 +10,7 @@ use crate::engine::round::{AnimationHint, Hint};
 use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
 use crate::tui::drawbuffer::DrawBuffer;
+use crate::tui::error::InnerError as TuiError;
 use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
@@ -893,6 +894,13 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         loop {
             state = match state {
                 GameState::Quit => return Ok(()),
+                GameState::TerminalTooSmall => match self.run_terminal_too_small() {
+                    Err(e) => {
+                        self.renderer.recover();
+                        return Err(e);
+                    }
+                    Ok(state) => state,
+                },
                 GameState::Active => match self.run_game_active() {
                     Err(e) => {
                         self.renderer.recover();
@@ -913,18 +921,12 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
 
     /// Run consumes the Tui48 instance and takes control of the terminal to begin gameplay.
     fn run_game_active(&mut self) -> Result<GameState> {
-        self.resize()?;
+        self.tui_board = match self.resize()? {
+            Some(tb) => Some(tb),
+            None => return Ok(GameState::TerminalTooSmall),
+        };
 
         loop {
-            let mut message_buf = match self.tui_board {
-                Some(_) => None,
-                None => {
-                    let mut buf = self.canvas.get_layer(7)?;
-                    buf.write_left("hey there! something is wrong! try resizing your terminal!")?;
-                    Some(buf)
-                }
-            };
-
             self.renderer.render(&self.canvas)?;
             log::trace!("rendered, waiting for input");
             match self.event_source.next_event()? {
@@ -936,14 +938,10 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                 }
                 Event::UserInput(UserInput::Quit) => break,
                 Event::Resize => {
-                    self.resize()?;
-                    match message_buf.take() {
-                        Some(b) => {
-                            drop(b);
-                        }
-                        None => (),
+                    self.tui_board = match self.resize()? {
+                        Some(tb) => Some(tb),
+                        None => return Ok(GameState::TerminalTooSmall),
                     };
-                    self.renderer.clear(&self.canvas)?;
                 }
             }
         }
@@ -954,18 +952,50 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         Ok(GameState::Active)
     }
 
-    fn resize(&mut self) -> Result<()> {
+    fn run_terminal_too_small(&mut self) -> Result<GameState> {
+        self.renderer.clear(&self.canvas)?;
+        loop {
+            let mut buf = self.canvas.get_layer(7)?;
+            buf.write_left("the terminal is too small, please make it bigger!")?;
+            self.renderer.render(&self.canvas)?;
+            match self.event_source.next_event()? {
+                Event::Resize => {
+                    self.tui_board = match self.resize()? {
+                        Some(tb) => Some(tb),
+                        None => continue,
+                    };
+                    break;
+                }
+                _ => continue,
+            }
+        }
+        self.renderer.clear(&self.canvas)?;
+        if self.board.is_game_over() {
+            Ok(GameState::Over)
+        } else {
+            Ok(GameState::Active)
+        }
+    }
+
+    fn resize(&mut self) -> Result<Option<Tui48Board>> {
         let (width, height) = self.renderer.size_hint()?;
         self.canvas = Canvas::new(width as usize, height as usize);
-        self.tui_board = match Tui48Board::new(&self.board, &mut self.canvas) {
-            Ok(tb) => Some(tb),
-            Err(Error::TerminalTooSmall(_, _)) => None,
-            Err(e) => return Err(e),
-        };
-        if let Some(tui_board) = &self.tui_board {
-            tui_board.check_bounds()?;
+
+        match Tui48Board::new(&self.board, &mut self.canvas) {
+            Ok(tb) => match tb.check_bounds() {
+                Err(_) => Ok(None),
+                Ok(_) => Ok(Some(tb)),
+            },
+            Err(Error::TerminalTooSmall(_, _)) => Ok(None),
+            Err(e) => match &e {
+                Error::TuiError { source: tui_error } => match tui_error.inner {
+                    TuiError::OutOfBoundsX(_) => Ok(None),
+                    TuiError::OutOfBoundsY(_) => Ok(None),
+                    _ => Err(e),
+                },
+                _ => Err(e),
+            },
         }
-        Ok(())
     }
 
     fn shift(&mut self, direction: Direction) -> Result<bool> {
@@ -1002,6 +1032,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
 enum GameState {
     Active,
     Over,
+    TerminalTooSmall,
     Quit,
 }
 
