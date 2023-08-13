@@ -141,7 +141,7 @@ impl Round {
 
     pub fn shift<T: Rng>(&mut self, mut rng: T, direction: &Direction) -> Option<AnimationHint> {
         let mut hint = AnimationHint::new();
-        let idxs = self.iter_mut(direction).collect::<Vec<Idx>>();
+        let idxs = self.indices(direction).collect::<Vec<Idx>>();
         let rows = idxs.chunks(4);
         for row in rows {
             let mut pivot_iter = row.iter();
@@ -199,7 +199,7 @@ impl Round {
 
 // private methods
 impl Round {
-    fn iter_mut(&self, direction: &Direction) -> Indices {
+    fn indices(&self, direction: &Direction) -> Indices {
         Indices::new(self, direction.clone())
     }
 
@@ -217,7 +217,7 @@ impl Round {
     }
 
     fn is_game_over(&self, direction_hint: &Direction) -> bool {
-        self.iter_mut(direction_hint).find(|v| self.get(&v) == 0).is_none()
+        self.indices(direction_hint).find(|v| self.get(&v) == 0).is_none()
     }
 
     #[cfg(test)]
