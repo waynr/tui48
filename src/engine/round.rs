@@ -199,6 +199,11 @@ impl Round {
             None
         }
     }
+
+    pub(crate) fn is_game_over(&self, direction_hint: &Direction) -> bool {
+        self.indices(direction_hint).find(|v| self.get(&v) == 0).is_none()
+    }
+
 }
 
 // private methods
@@ -218,10 +223,6 @@ impl Round {
     fn set(&mut self, idx: &Idx, value: Card) {
         let rf = self.get_mut(idx);
         *rf = value;
-    }
-
-    fn is_game_over(&self, direction_hint: &Direction) -> bool {
-        self.indices(direction_hint).find(|v| self.get(&v) == 0).is_none()
     }
 
     #[cfg(test)]

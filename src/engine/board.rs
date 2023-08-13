@@ -51,6 +51,13 @@ impl Board {
         (4, 4)
     }
 
+    pub(crate) fn is_game_over(&self) -> bool {
+        self.rounds
+            .last()
+            .expect("a board must always have at least one round")
+            .is_game_over(&Direction::Right)
+    }
+
     #[cfg(test)]
     pub(crate) fn set_initial_round(&mut self, round: Round) {
         let mut v = Vec::with_capacity(1);
