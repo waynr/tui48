@@ -149,6 +149,7 @@ fn handle_key_event(ke: KeyEvent) -> Option<UserInput> {
             KeyCode::Up | KeyCode::Char('k') => Some(UserInput::Direction(Direction::Up)),
             KeyCode::Down | KeyCode::Char('j') => Some(UserInput::Direction(Direction::Down)),
             KeyCode::Char('q') => Some(UserInput::Quit),
+            KeyCode::Char('n') => Some(UserInput::NewGame),
             _ => None,
         },
     }

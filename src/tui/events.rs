@@ -12,5 +12,6 @@ pub(crate) enum Event {
 
 pub(crate) enum UserInput {
     Direction(Direction),
+    NewGame,
     Quit,
 }
