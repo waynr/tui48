@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use palette::{FromColor, Lch, Srgb};
+use rand::thread_rng;
 
 use crate::engine::board::Board;
 use crate::engine::round::Idx as BoardIdx;
@@ -894,6 +895,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         loop {
             state = match state {
                 GameState::Quit => return Ok(()),
+                GameState::Reset => self.reset()?,
                 GameState::TerminalTooSmall => match self.run_terminal_too_small() {
                     Err(e) => {
                         self.renderer.recover();
@@ -936,6 +938,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
                         return Ok(GameState::Over);
                     }
                 }
+                Event::UserInput(UserInput::NewGame) => return Ok(GameState::Reset),
                 Event::UserInput(UserInput::Quit) => break,
                 Event::Resize => {
                     self.tui_board = match self.resize()? {
@@ -949,6 +952,32 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     }
 
     fn run_game_over(&mut self) -> Result<GameState> {
+        self.resize()?;
+
+        if let Some(tui_board) = &self.tui_board {
+            let board_rectangle = tui_board.board.rectangle();
+            let message_rectangle = board_rectangle.shrink_by(5, 8);
+            let mut buf = self.canvas.get_draw_buffer(message_rectangle)?;
+            buf.write_left("game over! press 'q' to quit or 'n' to start new game")?;
+            self.renderer.render(&self.canvas)?;
+            match self.event_source.next_event()? {
+                Event::UserInput(UserInput::Direction(d)) => {
+                    let game_over = self.shift(d)?;
+                    if game_over {
+                        return Ok(GameState::Over);
+                    }
+                }
+                Event::UserInput(UserInput::NewGame) => return Ok(GameState::Reset),
+                Event::UserInput(UserInput::Quit) => return Ok(GameState::Quit),
+                Event::Resize => {
+                    self.tui_board = match self.resize()? {
+                        Some(tb) => Some(tb),
+                        None => return Ok(GameState::TerminalTooSmall),
+                    };
+                }
+            }
+        }
+
         Ok(GameState::Active)
     }
 
@@ -977,6 +1006,13 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         }
     }
 
+    fn reset(&mut self) -> Result<GameState> {
+        let rng = thread_rng();
+        self.board = Board::new(rng);
+        self.tui_board = self.resize()?;
+        Ok(GameState::Active)
+    }
+
     fn resize(&mut self) -> Result<Option<Tui48Board>> {
         let (width, height) = self.renderer.size_hint()?;
         self.canvas = Canvas::new(width as usize, height as usize);
@@ -999,7 +1035,9 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     }
 
     fn shift(&mut self, direction: Direction) -> Result<bool> {
+        let mut game_over = false;
         if let Some(hint) = self.board.shift(direction) {
+            game_over = hint.game_over();
             let mut tui_board = self
                 .tui_board
                 .take()
@@ -1021,17 +1059,15 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             tui_board.teardown_animation()?;
             self.renderer.render(&self.canvas)?;
             let _ = self.tui_board.replace(tui_board);
-            if hint.game_over() {
-                return Ok(true);
-            }
         }
-        Ok(false)
+        Ok(game_over)
     }
 }
 
 enum GameState {
     Active,
     Over,
+    Reset,
     TerminalTooSmall,
     Quit,
 }
