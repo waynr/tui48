@@ -172,6 +172,23 @@ impl Rectangle {
 
         Rectangle(Idx(x, y, self.0 .2), Bounds2D(width, height))
     }
+
+    #[inline(always)]
+    pub(crate) fn shrink_by(&self, x_margin: usize, y_margin: usize) -> Rectangle {
+        let (x, width) = if self.1 .0 >= x_margin {
+            (self.0 .0 + x_margin, self.1 .0 - x_margin * 2)
+        } else {
+            (self.0 .0, 0)
+        };
+
+        let (y, height) = if self.1 .1 >= y_margin {
+            (self.0 .1 + y_margin, self.1 .1 - y_margin * 2)
+        } else {
+            (self.0 .1, 0)
+        };
+
+        Rectangle(Idx(x, y, self.0 .2), Bounds2D(width, height))
+    }
 }
 
 pub(crate) enum Geometry<'a> {
@@ -399,6 +416,36 @@ mod test {
         #[case] expected: Rectangle,
     ) {
         let actual = initial.expand_by(margin.0, margin.1);
+        assert_eq!(actual, expected);
+    }
+
+    #[rstest]
+    #[case::zero_rectangle_at_origin(rectangle(0, 0, 0, 0, 0), (0, 0), rectangle(0, 0, 0, 0, 0))]
+    #[case::zero_rectangle_away_from_origin(
+        rectangle(10, 10, 0, 0, 0),
+        (0, 0),
+        rectangle(10, 10, 0, 0, 0)
+    )]
+    #[case::zero_at_origin_shrink_by_1(rectangle(0, 0, 0, 0, 0), (1, 1), rectangle(0, 0, 0, 0, 0))]
+    #[case::zero_away_from_origin_shrink_by_1(
+        rectangle(10, 10, 0, 0, 0),
+        (1, 1),
+        rectangle(10, 10, 0, 0, 0)
+    )]
+    #[case::zero_near_origin_shrink_by_5(rectangle(3, 3, 0, 0, 0), (5, 5), rectangle(3, 3, 0, 0, 0))]
+    #[case::at_origin_shrink_2x2_by_1(rectangle(0, 0, 0, 2, 2), (1, 1), rectangle(1, 1, 0, 0, 0))]
+    #[case::at_origin_shrink_3x3_by_1(rectangle(0, 0, 0, 3, 3), (1, 1), rectangle(1, 1, 0, 1, 1))]
+    #[case::at_origin_shrink_20x20_by_5(rectangle(0, 0, 0, 20, 20), (5, 5), rectangle(5, 5, 0, 10, 10))]
+    #[case::away_from_origin_shrink_2x2_by_1(rectangle(10, 10, 0, 2, 2), (1, 1), rectangle(11, 11, 0, 0, 0))]
+    #[case::away_from_origin_shrink_3x3_by_1(rectangle(10, 10, 0, 3, 3), (1, 1), rectangle(11, 11, 0, 1, 1))]
+    #[case::away_from_origin_shrink_20x20_by_5(rectangle(10, 10, 0, 20, 20), (5, 5), rectangle(15, 15, 0, 10, 10))]
+    #[case::near_origin_shrink_30x30_by_5(rectangle(3, 3, 0, 30, 30), (5, 5), rectangle(8, 8, 0, 20, 20))]
+    fn validate_shrink_by(
+        #[case] initial: Rectangle,
+        #[case] margin: (usize, usize),
+        #[case] expected: Rectangle,
+    ) {
+        let actual = initial.shrink_by(margin.0, margin.1);
         assert_eq!(actual, expected);
     }
 }
