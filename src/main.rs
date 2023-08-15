@@ -1,6 +1,7 @@
 use std::io::stdout;
 
 use anyhow::Result;
+use clap::Parser;
 use rand::thread_rng;
 
 mod engine;
@@ -12,7 +13,15 @@ use engine::board::Board;
 use tui::crossterm::{Crossterm, CrosstermEvents};
 use tui48::{init, Tui48};
 
+#[derive(Debug, Parser)]
+struct Cli {
+    #[clap(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
+}
+
 fn main() -> Result<()> {
+    let cli = Cli::parse();
+
     let rng = thread_rng();
     let board = Board::new(rng);
     let w = stdout().lock();
@@ -28,21 +37,13 @@ fn main() -> Result<()> {
                 message,
             ))
         })
-        .level(log::LevelFilter::Trace)
+        .level(cli.verbose.log_level_filter())
         .chain(fern::log_file("./output.log")?)
         .apply()?;
-
-    log::info!("log test");
 
     init()?;
 
     tui48.run()?;
-    // match tui48.run() {
-    //     Err(e) => {
-    //         eprintln!("{}", e);
-    //     },
-    //     Ok(_) => eprintln!("everything okay!"),
-    // }
 
     Ok(())
 }
