@@ -24,11 +24,15 @@ cd tui48
 cargo install --path ./
 ```
 
+**Note**: this approach assumes you have the [cargo install] target directory
+included in your shell's `PATH` variable.  If you don't then instead of running
+`tui48` in your path, you will have to run `<PATH_TO_TUI48>/target/debug/tui48`
+
 ## Running
 
-Once installed, try running it in your favorite terminal emulator!. I recommend
-[alacritty], which what I prefer for my every day terminal usage and is the
-only terminal emulator I've tested it on.
+Once installed, try running `tui48` in your favorite terminal emulator!. I
+recommend [alacritty], which what I prefer for my every day terminal usage and
+is the only terminal emulator I've tested it on. Here's how to do it:
 
 If you do use a different terminal emulator, please let me know and report any
 bugs on this git repo's issue tracker!
@@ -70,4 +74,4 @@ will allow the player to continue as far as they can to produce higher values
 [terminal emulator]: https://en.wikipedia.org/wiki/Terminal_emulator
 [using rustup]: https://rustup.rs/
 [alacritty]: https://github.com/alacritty/alacritty
-
+[cargo install]: https://doc.rust-lang.org/cargo/commands/cargo-install.html
