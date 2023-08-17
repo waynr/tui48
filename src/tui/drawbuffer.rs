@@ -310,6 +310,47 @@ impl DrawBufferInner {
     }
 }
 
+pub(crate) trait DrawBufferOwner {
+    fn lock<'a>(&'a self) -> MutexGuard<'a, DrawBufferInner>;
+    fn inner(&self) -> Arc<Mutex<DrawBufferInner>>;
+
+    fn modify(&mut self, modifier: Modifier) {
+        self.lock().modifiers.push(modifier)
+    }
+
+    fn draw_border(&mut self) -> Result<()> {
+        self.lock().draw_border()
+    }
+
+    fn fill(&mut self, c: char) -> Result<()> {
+        self.lock().fill(c)
+    }
+
+    fn write_left(&mut self, s: &str) -> Result<()> {
+        self.lock().write_left(s)
+    }
+
+    fn write_right(&mut self, s: &str) -> Result<()> {
+        self.lock().write_right(s)
+    }
+
+    fn write_center(&mut self, s: &str) -> Result<()> {
+        self.lock().write_center(s)
+    }
+
+    fn translate(&self, dir: Direction) -> Result<()> {
+        self.lock().translate(dir)
+    }
+
+    fn switch_layer(&self, zdx: usize) -> Result<()> {
+        self.lock().switch_layer(zdx)
+    }
+
+    fn rectangle(&self) -> Rectangle {
+        self.lock().rectangle()
+    }
+}
+
 pub(crate) struct DrawBuffer {
     inner: Arc<Mutex<DrawBufferInner>>,
     sender: Sender<Tuxel>,
@@ -339,66 +380,18 @@ impl DrawBuffer {
             sender,
         }
     }
-
-    pub(crate) fn push(&mut self, t: Tuxel) -> DBTuxel {
-        let mut inner = self.lock();
-        let canvas_idx = t.idx();
-        let buf_idx = Idx(
-            canvas_idx.0 - inner.rectangle.x(),
-            canvas_idx.1 - inner.rectangle.y(),
-            0,
-        );
-        inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
-        DBTuxel {
-            parent: self.inner.clone(),
-            canvas_idx,
-            buf_idx,
-        }
-    }
-
-    pub(crate) fn modify(&mut self, modifier: Modifier) {
-        self.lock().modifiers.push(modifier)
-    }
-
-    pub(crate) fn draw_border(&mut self) -> Result<()> {
-        self.lock().draw_border()
-    }
-
-    pub(crate) fn fill(&mut self, c: char) -> Result<()> {
-        self.lock().fill(c)
-    }
-
-    pub(crate) fn write_left(&mut self, s: &str) -> Result<()> {
-        self.lock().write_left(s)
-    }
-
-    pub(crate) fn write_right(&mut self, s: &str) -> Result<()> {
-        self.lock().write_right(s)
-    }
-
-    pub(crate) fn write_center(&mut self, s: &str) -> Result<()> {
-        self.lock().write_center(s)
-    }
-
-    pub(crate) fn translate(&self, dir: Direction) -> Result<()> {
-        self.lock().translate(dir)
-    }
-
-    pub(crate) fn switch_layer(&self, zdx: usize) -> Result<()> {
-        self.lock().switch_layer(zdx)
-    }
-
-    pub(crate) fn rectangle(&self) -> Rectangle {
-        self.lock().rectangle()
-    }
 }
 
-impl<'a> DrawBuffer {
-    pub(crate) fn lock(&'a self) -> MutexGuard<'a, DrawBufferInner> {
+impl DrawBufferOwner for DrawBuffer {
+    fn lock<'a>(&'a self) -> MutexGuard<'a, DrawBufferInner> {
         self.inner
             .as_ref()
             .lock()
             .expect("TODO: handle thread panicking better than this")
+    }
+
+    fn inner(&self) -> Arc<Mutex<DrawBufferInner>> {
+        self.inner.clone()
     }
 }
 
@@ -424,6 +417,13 @@ pub(crate) struct DBTuxel {
 }
 
 impl DBTuxel {
+    pub(crate) fn new(parent: Arc<Mutex<DrawBufferInner>>, canvas_idx: Idx, buf_idx: Idx) -> Self {
+        Self {
+            parent,
+            canvas_idx,
+            buf_idx,
+        }
+    }
     fn lock(&self) -> MutexGuard<DrawBufferInner> {
         self.parent
             .lock()
