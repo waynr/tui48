@@ -2,7 +2,7 @@ use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::colors::Rgb;
-use super::drawbuffer::{DBTuxel, DrawBuffer};
+use super::drawbuffer::{DBTuxel, DrawBuffer, DrawBufferOwner};
 use super::error::{InnerError, Result, TuiError};
 use super::geometry::{Bounds2D, Geometry, Idx, Rectangle};
 use super::tuxel::Tuxel;
@@ -39,7 +39,7 @@ impl CanvasInner {
                     Cell::Empty => Tuxel::new(Idx(x, y, r.z()), self.idx_sender.clone()),
                     _ => return Err(InnerError::CellAlreadyOwned.into()),
                 };
-                let db_tuxel = dbuf.push(tuxel);
+                let db_tuxel = Self::push(&mut dbuf, tuxel);
                 cellstack.replace(canvas_idx.z(), Cell::DBTuxel(db_tuxel));
             }
         }
@@ -191,6 +191,21 @@ impl CanvasInner {
             }
         }
         false
+    }
+}
+
+// DrawBufferOwner functions
+impl CanvasInner {
+    fn push<T: DrawBufferOwner>(dbo: &mut T, t: Tuxel) -> DBTuxel {
+        let mut inner = dbo.lock();
+        let canvas_idx = t.idx();
+        let buf_idx = Idx(
+            canvas_idx.0 - inner.rectangle.x(),
+            canvas_idx.1 - inner.rectangle.y(),
+            0,
+        );
+        inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
+        DBTuxel::new(dbo.inner(), canvas_idx, buf_idx)
     }
 }
 

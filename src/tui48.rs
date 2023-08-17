@@ -10,7 +10,7 @@ use crate::engine::round::{AnimationHint, Hint};
 
 use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
-use crate::tui::drawbuffer::DrawBuffer;
+use crate::tui::drawbuffer::{DrawBufferOwner, DrawBuffer};
 use crate::tui::error::InnerError as TuiError;
 use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
