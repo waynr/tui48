@@ -209,7 +209,7 @@ impl Canvas {
             grid.push(row);
         }
 
-        let (idx_sender, idx_receiver) = sync_channel(width*height*20);
+        let (idx_sender, idx_receiver) = sync_channel(width * height * 20);
         let (tuxel_sender, tuxel_receiver) = channel();
         let c = Self {
             inner: Arc::new(Mutex::new(CanvasInner {
@@ -534,7 +534,7 @@ mod test {
     #[case::base((5, 5))]
     #[case::realistic((274, 75))]
     fn get_layer_validate_draw_buffer_size(#[case] dims: (usize, usize)) -> Result<()> {
-        let canvas = Canvas::new(dims.0, dims.1);
+        let mut canvas = Canvas::new(dims.0, dims.1);
         let dbuf = canvas.get_layer(0)?;
         let inner = dbuf.lock();
         assert_eq!(inner.buf.len(), dims.1);
