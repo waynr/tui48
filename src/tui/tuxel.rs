@@ -32,6 +32,14 @@ impl Tuxel {
             .expect("idx sender has a big buffer, it shouldn't fail");
     }
 
+    pub(crate) fn set_bgcolor(&mut self, color: Rgb) {
+        self.bgcolor = Some(color);
+    }
+
+    pub(crate) fn set_fgcolor(&mut self, color: Rgb) {
+        self.fgcolor = Some(color);
+    }
+
     pub(crate) fn clear(&mut self) {
         self.active = false;
         self.content = ' ';

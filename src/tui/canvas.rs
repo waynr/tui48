@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::colors::Rgb;
 use super::drawbuffer::{DBTuxel, DrawBuffer, DrawBufferOwner};
+use super::textbuffer::TextBuffer;
 use super::error::{InnerError, Result, TuiError};
 use super::geometry::{Bounds2D, Geometry, Idx, Rectangle};
 use super::tuxel::Tuxel;
@@ -238,6 +239,18 @@ impl Canvas {
             inner.reclaim();
             inner.rectangle.contains_or_err(Geometry::Rectangle(&r))?;
             DrawBuffer::new(inner.tuxel_sender.clone(), r.clone(), c)
+        };
+        self.populate_drawbuffer(&mut dbuf)?;
+        Ok(dbuf)
+    }
+
+    pub(crate) fn get_text_buffer(&self, r: Rectangle) -> Result<TextBuffer> {
+        let c = self.clone();
+        let mut dbuf = {
+            let mut inner = self.lock();
+            inner.reclaim();
+            inner.rectangle.contains_or_err(Geometry::Rectangle(&r))?;
+            TextBuffer::new(inner.tuxel_sender.clone(), r.clone(), c)
         };
         self.populate_drawbuffer(&mut dbuf)?;
         Ok(dbuf)

@@ -124,7 +124,7 @@ impl DrawBufferInner {
     }
 
     #[inline(always)]
-    fn get_tuxel_mut(&mut self, pos: Position) -> Result<&mut Tuxel> {
+    pub (crate) fn get_tuxel_mut(&mut self, pos: Position) -> Result<&mut Tuxel> {
 
         let (x, y) = self.rectangle.relative_idx(&pos);
         let t = self
