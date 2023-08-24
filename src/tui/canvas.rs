@@ -21,35 +21,6 @@ struct CanvasInner {
 }
 
 impl CanvasInner {
-    fn get_draw_buffer(&mut self, c: Canvas, r: Rectangle) -> Result<DrawBuffer> {
-        self.reclaim();
-        self.rectangle.contains_or_err(Geometry::Rectangle(&r))?;
-        let mut dbuf = DrawBuffer::new(self.tuxel_sender.clone(), r.clone(), c);
-        for (y, row) in self
-            .grid
-            .iter_mut()
-            .enumerate()
-            .skip(r.y())
-            .take(r.height())
-        {
-            for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
-                let canvas_idx = Idx(x, y, r.0 .2);
-                let cell = cellstack.acquire(canvas_idx.z());
-                let tuxel = match cell {
-                    Cell::Empty => Tuxel::new(Idx(x, y, r.z()), self.idx_sender.clone()),
-                    _ => return Err(InnerError::CellAlreadyOwned.into()),
-                };
-                let db_tuxel = Self::push(&mut dbuf, tuxel);
-                cellstack.replace(canvas_idx.z(), Cell::DBTuxel(db_tuxel));
-            }
-        }
-        Ok(dbuf)
-    }
-
-    fn get_layer(&mut self, c: Canvas, z: usize) -> Result<DrawBuffer> {
-        self.get_draw_buffer(c, Rectangle(Idx(0, 0, z), self.rectangle.1.clone()))
-    }
-
     fn dimensions(&self) -> (usize, usize) {
         (self.rectangle.1 .0, self.rectangle.1 .1)
     }
@@ -194,21 +165,6 @@ impl CanvasInner {
     }
 }
 
-// DrawBufferOwner functions
-impl CanvasInner {
-    fn push<T: DrawBufferOwner>(dbo: &mut T, t: Tuxel) -> DBTuxel {
-        let mut inner = dbo.lock();
-        let canvas_idx = t.idx();
-        let buf_idx = Idx(
-            canvas_idx.0 - inner.rectangle.x(),
-            canvas_idx.1 - inner.rectangle.y(),
-            0,
-        );
-        inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
-        DBTuxel::new(dbo.inner(), canvas_idx, buf_idx)
-    }
-}
-
 impl std::fmt::Display for CanvasInner {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for i in 0..CANVAS_DEPTH {
@@ -277,12 +233,44 @@ impl Canvas {
 
     pub(crate) fn get_draw_buffer(&self, r: Rectangle) -> Result<DrawBuffer> {
         let c = self.clone();
-        self.lock().get_draw_buffer(c, r)
+        let mut dbuf = {
+            let mut inner = self.lock();
+            inner.reclaim();
+            inner.rectangle.contains_or_err(Geometry::Rectangle(&r))?;
+            DrawBuffer::new(inner.tuxel_sender.clone(), r.clone(), c)
+        };
+        self.populate_drawbuffer(&mut dbuf)?;
+        Ok(dbuf)
     }
 
-    pub(crate) fn get_layer(&self, z: usize) -> Result<DrawBuffer> {
-        let c = self.clone();
-        self.lock().get_layer(c, z)
+    fn populate_drawbuffer<T: DrawBufferOwner>(&self, dbo: &mut T) -> Result<()> {
+        let r = dbo.rectangle();
+        let mut inner = self.lock();
+        let sender = inner.idx_sender.clone();
+        for (y, row) in inner
+            .grid
+            .iter_mut()
+            .enumerate()
+            .skip(r.y())
+            .take(r.height())
+        {
+            for (x, cellstack) in row.iter_mut().enumerate().skip(r.x()).take(r.width()) {
+                let canvas_idx = Idx(x, y, r.0 .2);
+                let cell = cellstack.acquire(canvas_idx.z());
+                let tuxel = match cell {
+                    Cell::Empty => Tuxel::new(Idx(x, y, r.z()), sender.clone()),
+                    _ => return Err(InnerError::CellAlreadyOwned.into()),
+                };
+                let db_tuxel = Self::push(dbo, tuxel);
+                cellstack.replace(canvas_idx.z(), Cell::DBTuxel(db_tuxel));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn get_layer(&mut self, z: usize) -> Result<DrawBuffer> {
+        let rectangle = { self.lock().rectangle.clone() };
+        self.get_draw_buffer(Rectangle(Idx(0, 0, z), rectangle.1.clone()))
     }
 
     pub(crate) fn bounds(&self) -> Bounds2D {
@@ -313,6 +301,21 @@ impl Canvas {
     pub(crate) fn reclaim(&mut self) -> Result<()> {
         self.lock().reclaim();
         Ok(())
+    }
+}
+
+// DrawBufferOwner functions
+impl Canvas {
+    fn push<T: DrawBufferOwner>(dbo: &mut T, t: Tuxel) -> DBTuxel {
+        let mut inner = dbo.lock();
+        let canvas_idx = t.idx();
+        let buf_idx = Idx(
+            canvas_idx.0 - inner.rectangle.x(),
+            canvas_idx.1 - inner.rectangle.y(),
+            0,
+        );
+        inner.buf.iter_mut().nth(buf_idx.1).expect("meow").push(t);
+        DBTuxel::new(dbo.inner(), canvas_idx, buf_idx)
     }
 }
 
