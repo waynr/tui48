@@ -7,3 +7,4 @@ pub(crate) mod crossterm;
 pub(crate) mod error;
 pub(crate) mod events;
 pub(crate) mod renderer;
+pub(crate) mod textbuffer;

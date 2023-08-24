@@ -25,6 +25,7 @@ clap-verbosity-flag = "2.0"
 # drawing & colors
 boxy = "0.1"
 palette = "0.7"
+textwrap = { version = "0.16", features = ["smawk"] }
 
 # rendering
 crossterm = "0.26"
