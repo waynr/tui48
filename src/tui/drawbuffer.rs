@@ -7,6 +7,47 @@ use super::error::{InnerError, Result};
 use super::geometry::{Direction, Idx, Position, Rectangle};
 use super::tuxel::Tuxel;
 
+pub(crate) trait DrawBufferOwner {
+    fn lock<'a>(&'a self) -> MutexGuard<'a, DrawBufferInner>;
+    fn inner(&self) -> Arc<Mutex<DrawBufferInner>>;
+
+    fn modify(&mut self, modifier: Modifier) {
+        self.lock().modifiers.push(modifier)
+    }
+
+    fn draw_border(&mut self) -> Result<()> {
+        self.lock().draw_border()
+    }
+
+    fn fill(&mut self, c: char) -> Result<()> {
+        self.lock().fill(c)
+    }
+
+    fn write_left(&mut self, s: &str) -> Result<()> {
+        self.lock().write_left(s)
+    }
+
+    fn write_right(&mut self, s: &str) -> Result<()> {
+        self.lock().write_right(s)
+    }
+
+    fn write_center(&mut self, s: &str) -> Result<()> {
+        self.lock().write_center(s)
+    }
+
+    fn translate(&self, dir: Direction) -> Result<()> {
+        self.lock().translate(dir)
+    }
+
+    fn switch_layer(&self, zdx: usize) -> Result<()> {
+        self.lock().switch_layer(zdx)
+    }
+
+    fn rectangle(&self) -> Rectangle {
+        self.lock().rectangle()
+    }
+}
+
 pub(crate) struct DrawBufferInner {
     pub(crate) rectangle: Rectangle,
     pub(crate) border: bool,
@@ -307,47 +348,6 @@ impl DrawBufferInner {
 
     fn tuxel_content(&self, x: usize, y: usize) -> Result<char> {
         Ok(self.get_tuxel(Position::Coordinates(x, y))?.content())
-    }
-}
-
-pub(crate) trait DrawBufferOwner {
-    fn lock<'a>(&'a self) -> MutexGuard<'a, DrawBufferInner>;
-    fn inner(&self) -> Arc<Mutex<DrawBufferInner>>;
-
-    fn modify(&mut self, modifier: Modifier) {
-        self.lock().modifiers.push(modifier)
-    }
-
-    fn draw_border(&mut self) -> Result<()> {
-        self.lock().draw_border()
-    }
-
-    fn fill(&mut self, c: char) -> Result<()> {
-        self.lock().fill(c)
-    }
-
-    fn write_left(&mut self, s: &str) -> Result<()> {
-        self.lock().write_left(s)
-    }
-
-    fn write_right(&mut self, s: &str) -> Result<()> {
-        self.lock().write_right(s)
-    }
-
-    fn write_center(&mut self, s: &str) -> Result<()> {
-        self.lock().write_center(s)
-    }
-
-    fn translate(&self, dir: Direction) -> Result<()> {
-        self.lock().translate(dir)
-    }
-
-    fn switch_layer(&self, zdx: usize) -> Result<()> {
-        self.lock().switch_layer(zdx)
-    }
-
-    fn rectangle(&self) -> Rectangle {
-        self.lock().rectangle()
     }
 }
 
