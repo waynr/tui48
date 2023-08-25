@@ -110,7 +110,7 @@ impl TextBuffer {
         }
 
         if rect.width() == 0 || rect.height() == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         let bufs = self
@@ -150,19 +150,19 @@ impl TextBuffer {
 
             if y_index > rect.height() {
                 // can't write beyond the bottom of the rectangle
-                break
+                break;
             }
 
             let width_diff = if buflen > rect.width() {
                 // we shouldn't reach this point because we wrapped on the rectangle width earlier.
-                return Err(InnerError::OutOfBoundsX(buflen).into())
+                return Err(InnerError::OutOfBoundsX(buflen).into());
             } else {
                 rect.width() - buflen
             };
 
             let x_index = match &self.format.halign {
                 HAlignment::Left => 0,
-                HAlignment::Center => width_diff/2,
+                HAlignment::Center => width_diff / 2,
                 HAlignment::Right => width_diff,
             };
 
@@ -177,7 +177,7 @@ impl TextBuffer {
                     tuxel.set_fgcolor(c.clone());
                 }
             }
-            
+
             y_index += 1;
         }
 
@@ -186,7 +186,7 @@ impl TextBuffer {
 }
 
 #[cfg(test)]
-impl TextBuffer{
+impl TextBuffer {
     pub(crate) fn set_sender(&mut self, sender: Sender<Tuxel>) {
         self.sender = sender
     }
