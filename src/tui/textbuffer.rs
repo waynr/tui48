@@ -87,11 +87,11 @@ impl TextBuffer {
         }
     }
 
-    pub fn format(&mut self, format: &FormatOptions) {
-        if &self.format == format {
+    pub fn format(&mut self, format: FormatOptions) {
+        if self.format == format {
             return;
         }
-        self.format = format.clone()
+        self.format = format
     }
 
     pub fn write(&mut self, s: &str, fgcolor: Option<Rgb>, bgcolor: Option<Rgb>) {
@@ -194,10 +194,10 @@ impl TextBuffer {
 
 impl DrawBufferOwner for TextBuffer {
     fn lock<'a>(&'a self) -> MutexGuard<'a, DrawBufferInner> {
-        self.inner
-            .as_ref()
-            .lock()
-            .expect("TODO: handle thread panicking better than this")
+        match self.inner.as_ref().lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        }
     }
 
     fn inner(&self) -> Arc<Mutex<DrawBufferInner>> {
@@ -217,5 +217,134 @@ impl Drop for TextBuffer {
             }
         }
         let _ = inner.canvas.reclaim();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::mpsc::channel;
+
+    use rstest::*;
+
+    use super::super::geometry::{Bounds2D, Idx, Rectangle};
+    use super::*;
+
+    fn from_strs(ss: Vec<&str>) -> Vec<Vec<char>> {
+        ss.into_iter()
+            .map(|s| s.chars().collect::<Vec<char>>())
+            .collect()
+    }
+
+    fn fo(halign: HAlignment, valign: VAlignment) -> Option<FormatOptions> {
+        Some(FormatOptions { halign, valign })
+    }
+
+    #[rstest]
+    #[case::default(None, "meow", from_strs(vec![
+        "          ",
+        "          ",
+        "   meow   ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::center_middle(fo(HAlignment::Center, VAlignment::Middle), "meow", from_strs(vec![
+        "          ",
+        "          ",
+        "   meow   ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::center_top(fo(HAlignment::Center, VAlignment::Top), "meow", from_strs(vec![
+        "   meow   ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::center_bottom(fo(HAlignment::Center, VAlignment::Bottom), "meow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "   meow   ",
+    ]))]
+    #[case::left_middle(fo(HAlignment::Left, VAlignment::Middle), "meow", from_strs(vec![
+        "          ",
+        "          ",
+        "meow      ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::left_top(fo(HAlignment::Left, VAlignment::Top), "meow", from_strs(vec![
+        "meow      ",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::left_bottom(fo(HAlignment::Left, VAlignment::Bottom), "meow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "meow      ",
+    ]))]
+    #[case::right_middle(fo(HAlignment::Right, VAlignment::Middle), "meow", from_strs(vec![
+        "          ",
+        "          ",
+        "      meow",
+        "          ",
+        "          ",
+    ]))]
+    #[case::right_top(fo(HAlignment::Right, VAlignment::Top), "meow", from_strs(vec![
+        "      meow",
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::right_bottom(fo(HAlignment::Right, VAlignment::Bottom), "meow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        "          ",
+        "      meow",
+    ]))]
+    fn validate_formatting_no_border(
+        #[case] fo: Option<FormatOptions>,
+        #[case] text: &str,
+        #[case] expected: Vec<Vec<char>>,
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let rect = Rectangle(Idx(0, 0, 0), Bounds2D(10, 5));
+        let canvas = Canvas::new(20, 20);
+        let mut tbuf = canvas.get_text_buffer(rect.clone())?;
+
+        if let Some(fo) = fo {
+            tbuf.format(fo);
+        }
+
+        tbuf.fill(' ')?;
+        tbuf.write(text, None, None);
+        tbuf.flush()?;
+
+        let rect = (&tbuf as &dyn DrawBufferOwner).rectangle();
+        let indices = rect.into_iter();
+        {
+            let inner = tbuf.lock();
+            for idx in indices {
+                let t = inner.get_tuxel(Position::Idx(idx.clone()))?;
+                let row = expected
+                    .get(idx.y())
+                    .ok_or(InnerError::OutOfBoundsY(idx.y()))?;
+                let expected = row
+                    .get(idx.x())
+                    .ok_or(InnerError::OutOfBoundsX(idx.x()))?
+                    .clone();
+                let actual = t.content();
+                assert_eq!(actual, expected);
+            }
+        }
+
+        Ok(())
     }
 }
