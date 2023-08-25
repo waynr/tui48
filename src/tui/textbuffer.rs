@@ -185,6 +185,13 @@ impl TextBuffer {
     }
 }
 
+#[cfg(test)]
+impl TextBuffer{
+    pub(crate) fn set_sender(&mut self, sender: Sender<Tuxel>) {
+        self.sender = sender
+    }
+}
+
 impl DrawBufferOwner for TextBuffer {
     fn lock<'a>(&'a self) -> MutexGuard<'a, DrawBufferInner> {
         self.inner

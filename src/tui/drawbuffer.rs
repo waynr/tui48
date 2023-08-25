@@ -523,6 +523,37 @@ mod test {
         assert_eq!(count, expected);
     }
 
+    enum DBType {
+        DrawBuffer,
+        TextBuffer,
+    }
+
+    impl DBType {
+        fn to_draw_buffer(
+            &self,
+            rect: &Rectangle,
+            canvas: &Canvas,
+            sender: Option<Sender<Tuxel>>,
+        ) -> Result<Box<dyn DrawBufferOwner>> {
+            Ok(match self {
+                DBType::DrawBuffer => {
+                    let mut dbuf = canvas.get_draw_buffer(rect.clone())?;
+                    if let Some(sender) = sender {
+                        dbuf.sender = sender.clone();
+                    }
+                    Box::new(dbuf)
+                }
+                DBType::TextBuffer => {
+                    let mut tbuf = canvas.get_text_buffer(rect.clone())?;
+                    if let Some(sender) = sender {
+                        tbuf.set_sender(sender.clone());
+                    }
+                    Box::new(tbuf)
+                }
+            })
+        }
+    }
+
     // #[case::<CASENAME>(
     //     rectangle(<X>, <Y>, <Z>, <WIDTH>, <HEIGHT>),
     // )]
@@ -532,11 +563,19 @@ mod test {
     #[case::ignore_index(rectangle(10, 10, 0, 10, 10))]
     #[case::zero_width_draw_buffer(rectangle(0, 0, 0, 0, 10))]
     #[case::zero_height_draw_buffer(rectangle(0, 0, 0, 10, 0))]
-    fn new_draw_buffer(#[case] rect: Rectangle) -> Result<()> {
+    fn new_draw_buffer(
+        #[case] rect: Rectangle,
+        #[values(DBType::TextBuffer, DBType::DrawBuffer)] dbtype: DBType,
+    ) -> Result<()> {
         let canvas = Canvas::new(rect.width() * 2, rect.height() * 2);
         let (sender, receiver) = channel();
-        let mut dbuf = canvas.get_draw_buffer(rect.clone())?;
-        dbuf.sender = sender.clone();
+
+        // need to hold on to at least one Sender<Tuxel> to avoid causing verify_messages_sent to
+        // panic due to the channel being disconnected
+        let _dontdropsender = sender.clone();
+
+        let dbuf = dbtype.to_draw_buffer(&rect, &canvas, Some(sender))?;
+
         {
             let inner = dbuf.lock();
             assert_eq!(inner.buf.len(), rect.height());
@@ -561,9 +600,13 @@ mod test {
     #[case::base_same_layer(rectangle(0, 0, 0, 5, 5), 1)]
     #[case::one_layer_down(rectangle(0, 0, 1, 5, 5), 0)]
     #[case::one_layer_up(rectangle(0, 0, 1, 5, 5), 2)]
-    fn drawbuffer_switch_layer(#[case] rect: Rectangle, #[case] target_layer: usize) -> Result<()> {
+    fn drawbuffer_switch_layer(
+        #[case] rect: Rectangle,
+        #[case] target_layer: usize,
+        #[values(DBType::TextBuffer, DBType::DrawBuffer)] dbtype: DBType,
+    ) -> Result<()> {
         let canvas = Canvas::new(rect.width() * 2, rect.height() * 2);
-        let dbuf = canvas.get_draw_buffer(rect.clone())?;
+        let dbuf = dbtype.to_draw_buffer(&rect, &canvas, None)?;
         for _ in 0..10 {
             dbuf.switch_layer(target_layer)?;
             dbuf.switch_layer(rect.0 .2)?;
@@ -593,9 +636,10 @@ mod test {
         #[case] canvas_height: usize,
         #[case] canvas_width: usize,
         #[case] rect: Rectangle,
+        #[values(DBType::TextBuffer, DBType::DrawBuffer)] dbtype: DBType,
     ) -> Result<()> {
         let canvas = Canvas::new(canvas_height, canvas_width);
-        let r = canvas.get_draw_buffer(rect.clone());
+        let r = dbtype.to_draw_buffer(&rect, &canvas, None);
         assert!(r.is_err());
         Ok(())
     }
