@@ -125,7 +125,7 @@ impl TextBuffer {
             (_, Ordering::Equal) => (0usize, 0usize),
             (VAlignment::Middle, Ordering::Less) => {
                 let difference = rect.height() - bufs.len();
-                let y_index = difference / 2;
+                let y_index = difference / 2 + difference % 2;
                 (y_index, 0)
             }
             (VAlignment::Middle, Ordering::Greater) => {
@@ -162,7 +162,7 @@ impl TextBuffer {
 
             let x_index = match &self.format.halign {
                 HAlignment::Left => 0,
-                HAlignment::Center => width_diff / 2,
+                HAlignment::Center => width_diff / 2 + width_diff % 2,
                 HAlignment::Right => width_diff,
             };
 
@@ -222,8 +222,6 @@ impl Drop for TextBuffer {
 
 #[cfg(test)]
 mod test {
-    use std::sync::mpsc::channel;
-
     use rstest::*;
 
     use super::super::geometry::{Bounds2D, Idx, Rectangle};
@@ -310,6 +308,155 @@ mod test {
         "          ",
         "      meow",
     ]))]
+    #[case::wrapping_default(None, "meowmeowmeow", from_strs(vec![
+        "          ",
+        "          ",
+        "meowmeowme",
+        "    ow    ",
+        "          ",
+    ]))]
+    #[case::wrapping_center_middle(fo(HAlignment::Center, VAlignment::Middle), "meowmeowmeow", from_strs(vec![
+        "          ",
+        "          ",
+        "meowmeowme",
+        "    ow    ",
+        "          ",
+    ]))]
+    #[case::wrapping_center_top(fo(HAlignment::Center, VAlignment::Top), "meowmeowmeow", from_strs(vec![
+        "meowmeowme",
+        "    ow    ",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::wrapping_center_bottom(fo(HAlignment::Center, VAlignment::Bottom), "meowmeowmeow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        "meowmeowme",
+        "    ow    ",
+    ]))]
+    #[case::wrapping_left_middle(fo(HAlignment::Left, VAlignment::Middle), "meowmeowmeow", from_strs(vec![
+        "          ",
+        "          ",
+        "meowmeowme",
+        "ow        ",
+        "          ",
+    ]))]
+    #[case::wrapping_left_top(fo(HAlignment::Left, VAlignment::Top), "meowmeowmeow", from_strs(vec![
+        "meowmeowme",
+        "ow        ",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::wrapping_left_bottom(fo(HAlignment::Left, VAlignment::Bottom), "meowmeowmeow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        "meowmeowme",
+        "ow        ",
+    ]))]
+    #[case::wrapping_right_middle(fo(HAlignment::Right, VAlignment::Middle), "meowmeowmeow", from_strs(vec![
+        "          ",
+        "          ",
+        "meowmeowme",
+        "        ow",
+        "          ",
+    ]))]
+    #[case::wrapping_right_top(fo(HAlignment::Right, VAlignment::Top), "meowmeowmeow", from_strs(vec![
+        "meowmeowme",
+        "        ow",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::wrapping_right_bottom(fo(HAlignment::Right, VAlignment::Bottom), "meowmeowmeow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        "meowmeowme",
+        "        ow",
+    ]))]
+    #[case::wrapping_multiword_default(None, "meow meow meow", from_strs(vec![
+        "          ",
+        "          ",
+        " meow meow",
+        "   meow   ",
+        "          ",
+    ]))]
+    #[case::wrapping_multiword_center_middle(fo(HAlignment::Center, VAlignment::Middle),
+                                             "meow meow meow", from_strs(vec![
+        "          ",
+        "          ",
+        " meow meow",
+        "   meow   ",
+        "          ",
+    ]))]
+    #[case::wrapping_multiword_center_top(fo(HAlignment::Center, VAlignment::Top),
+                                             "meow meow meow", from_strs(vec![
+        " meow meow",
+        "   meow   ",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::wrapping_multiword_center_bottom(fo(HAlignment::Center, VAlignment::Bottom),
+                                             "meow meow meow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        " meow meow",
+        "   meow   ",
+    ]))]
+    #[case::wrapping_multiword_left_middle(fo(HAlignment::Left, VAlignment::Middle),
+                                             "meow meow meow", from_strs(vec![
+        "          ",
+        "          ",
+        "meow meow ",
+        "meow      ",
+        "          ",
+    ]))]
+    #[case::wrapping_multiword_left_top(fo(HAlignment::Left, VAlignment::Top),
+                                             "meow meow meow", from_strs(vec![
+        "meow meow ",
+        "meow      ",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::wrapping_multiword_left_bottom(fo(HAlignment::Left, VAlignment::Bottom),
+                                             "meow meow meow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        "meow meow ",
+        "meow      ",
+    ]))]
+    #[case::wrapping_multiword_right_middle(fo(HAlignment::Right, VAlignment::Middle),
+                                             "meow meow meow", from_strs(vec![
+        "          ",
+        "          ",
+        " meow meow",
+        "      meow",
+        "          ",
+    ]))]
+    #[case::wrapping_multiword_right_top(fo(HAlignment::Right, VAlignment::Top),
+                                             "meow meow meow", from_strs(vec![
+        " meow meow",
+        "      meow",
+        "          ",
+        "          ",
+        "          ",
+    ]))]
+    #[case::wrapping_multiword_right_bottom(fo(HAlignment::Right, VAlignment::Bottom),
+                                             "meow meow meow", from_strs(vec![
+        "          ",
+        "          ",
+        "          ",
+        " meow meow",
+        "      meow",
+    ]))]
     fn validate_formatting_no_border(
         #[case] fo: Option<FormatOptions>,
         #[case] text: &str,
@@ -341,7 +488,16 @@ mod test {
                     .ok_or(InnerError::OutOfBoundsX(idx.x()))?
                     .clone();
                 let actual = t.content();
-                assert_eq!(actual, expected);
+                assert_eq!(
+                    actual,
+                    expected,
+                    "expected char '{}' at ({}, {}), got '{}'\nactual drawbuffer:\n{}",
+                    expected,
+                    idx.x(),
+                    idx.y(),
+                    actual,
+                    inner,
+                );
             }
         }
 
