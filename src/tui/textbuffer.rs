@@ -66,6 +66,12 @@ pub(crate) struct TextBuffer {
     sender: Sender<Tuxel>,
 }
 
+impl std::fmt::Display for TextBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.lock().fmt(f)
+    }
+}
+
 impl TextBuffer {
     pub(crate) fn new(sender: Sender<Tuxel>, rectangle: Rectangle, canvas: Canvas) -> Self {
         let mut buf: Vec<_> = Vec::with_capacity(rectangle.height());
@@ -233,8 +239,39 @@ mod test {
             .collect()
     }
 
+    fn add_borders(cc: &mut Vec<Vec<char>>) {
+        let box_corner = boxy::Char::upper_left(boxy::Weight::Doubled);
+        let box_horizontal = boxy::Char::horizontal(boxy::Weight::Doubled);
+        let box_vertical = boxy::Char::vertical(boxy::Weight::Doubled);
+
+        // get current buffer width, assuming all rows are the same width
+        let width = cc.first().unwrap().len();
+
+        // draw side borders first before adding new top and bottom row containing borders
+        for row in cc.iter_mut() {
+            row.insert(0, box_vertical.clone().into());
+            row.push(box_vertical.clone().into());
+        }
+
+        let mut top: Vec<char> = [Into::<char>::into(box_horizontal)].into_iter().cycle().take(width).collect();
+        let mut bottom: Vec<char> = top.clone();
+
+        top.insert(0, box_corner.clone().into());
+        top.push(box_corner.rotate_cw(1).clone().into());
+        bottom.insert(0, box_corner.clone().rotate_ccw(1).into());
+        bottom.push(box_corner.rotate_cw(2).clone().into());
+
+        cc.insert(0, top);
+        cc.push(bottom);
+    }
+
     fn fo(halign: HAlignment, valign: VAlignment) -> Option<FormatOptions> {
         Some(FormatOptions { halign, valign })
+    }
+
+    enum Border {
+        On,
+        Off,
     }
 
     #[rstest]
@@ -460,14 +497,27 @@ mod test {
     fn validate_formatting_no_border(
         #[case] fo: Option<FormatOptions>,
         #[case] text: &str,
-        #[case] expected: Vec<Vec<char>>,
+        #[case] mut expected: Vec<Vec<char>>,
+        #[values(Border::On, Border::Off)] border: Border,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let rect = Rectangle(Idx(0, 0, 0), Bounds2D(10, 5));
+        let bounds = match border {
+            Border::On => Bounds2D(12, 7),
+            Border::Off => Bounds2D(10, 5),
+        };
+        let rect = Rectangle(Idx(0, 0, 0), bounds);
         let canvas = Canvas::new(20, 20);
         let mut tbuf = canvas.get_text_buffer(rect.clone())?;
 
         if let Some(fo) = fo {
             tbuf.format(fo);
+        }
+
+        match border {
+            Border::On => {
+                add_borders(&mut expected);
+                tbuf.draw_border()?;
+            },
+            _ => (),
         }
 
         tbuf.fill(' ')?;
