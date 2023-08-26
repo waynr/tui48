@@ -965,7 +965,9 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             let board_rectangle = tui_board.board.rectangle();
             let message_rectangle = board_rectangle.shrink_by(5, 8);
             let mut buf = self.canvas.get_text_buffer(message_rectangle)?;
-            buf.write_left("game over! press 'q' to quit or 'n' to start new game")?;
+            buf.clear()?;
+            buf.write("game over! press 'q' to quit or 'n' to start new game", None, None);
+            buf.flush()?;
             self.renderer.render(&self.canvas)?;
             match self.event_source.next_event()? {
                 Event::UserInput(UserInput::Direction(d)) => {
@@ -991,8 +993,13 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
     fn run_terminal_too_small(&mut self) -> Result<GameState> {
         self.renderer.clear(&self.canvas)?;
         loop {
-            let mut buf = self.canvas.get_layer(7)?;
-            buf.write_left("the terminal is too small, please make it bigger!")?;
+            let (c_width, c_height) = self.canvas.dimensions();
+            let canvas_rectangle = Rectangle(Idx(0,0,0), Bounds2D(c_width, c_height));
+            let message_rectangle = canvas_rectangle.shrink_by(2, 2);
+            let mut buf = self.canvas.get_text_buffer(message_rectangle)?;
+            buf.clear()?;
+            buf.write("the terminal is too small, please make it bigger!", None, None);
+            buf.flush()?;
             self.renderer.render(&self.canvas)?;
             match self.event_source.next_event()? {
                 Event::Resize => {
