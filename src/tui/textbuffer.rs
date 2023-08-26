@@ -111,8 +111,13 @@ impl TextBuffer {
     pub fn flush(&mut self) -> Result<()> {
         let mut inner = self.lock();
         let mut rect = inner.rectangle.clone();
+        let mut y_offset = 0;
+        let mut x_offset = 0;
+
         if inner.border {
             rect = rect.shrink_by(1, 1);
+            y_offset += 1;
+            x_offset += 1;
         }
 
         if rect.width() == 0 || rect.height() == 0 {
@@ -127,25 +132,25 @@ impl TextBuffer {
             .collect::<Vec<CharBuf>>();
 
         let (mut y_index, buf_skip) = match (&self.format.valign, bufs.len().cmp(&rect.height())) {
-            (VAlignment::Top, _) => (0usize, 0usize),
-            (_, Ordering::Equal) => (0usize, 0usize),
+            (VAlignment::Top, _) => (0usize + y_offset, 0usize),
+            (_, Ordering::Equal) => (0usize + y_offset, 0usize),
             (VAlignment::Middle, Ordering::Less) => {
                 let difference = rect.height() - bufs.len();
                 let y_index = difference / 2 + difference % 2;
-                (y_index, 0)
+                (y_index + y_offset, 0)
             }
             (VAlignment::Middle, Ordering::Greater) => {
                 let difference = bufs.len() - rect.height();
                 let buf_skip = difference / 2;
-                (0, buf_skip)
+                (0 + y_offset, buf_skip)
             }
             (VAlignment::Bottom, Ordering::Less) => {
                 let y_index = rect.height() - bufs.len();
-                (y_index, 0)
+                (y_index + y_offset, 0)
             }
             (VAlignment::Bottom, Ordering::Greater) => {
                 let buf_skip = bufs.len() - rect.height();
-                (0, buf_skip)
+                (0 + y_offset, buf_skip)
             }
         };
 
@@ -170,7 +175,7 @@ impl TextBuffer {
                 HAlignment::Left => 0,
                 HAlignment::Center => width_diff / 2 + width_diff % 2,
                 HAlignment::Right => width_diff,
-            };
+            } + x_offset;
 
             for (offset, c) in charbuf.text.chars().enumerate() {
                 let pos = Position::Coordinates(x_index + offset, y_index);
