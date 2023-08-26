@@ -54,7 +54,7 @@ use crate::tui::renderer::Renderer;
 struct Tui48Board {
     canvas: Canvas,
     board: DrawBuffer,
-    score: DrawBuffer,
+    score: TextBuffer,
     slots: Vec<Vec<Slot>>,
     disappearing_slots: Vec<Slot>,
     moving_slots: Vec<Slot>,
@@ -83,7 +83,7 @@ impl Tui48Board {
         let mut board = canvas.get_draw_buffer(board_rectangle)?;
         board.draw_border()?;
 
-        let mut score = canvas.get_draw_buffer(score_rectangle)?;
+        let mut score = canvas.get_text_buffer(score_rectangle)?;
         Self::draw_score(&mut score, game.score())?;
 
         let (width, height) = game.dimensions();
@@ -193,10 +193,11 @@ impl Tui48Board {
         Ok(())
     }
 
-    fn draw_score(dbuf: &mut DrawBuffer, value: u16) -> Result<()> {
+    fn draw_score(dbuf: &mut TextBuffer, value: u16) -> Result<()> {
         dbuf.draw_border()?;
-        dbuf.fill(' ')?;
-        dbuf.write_right(&format!("{}", value))?;
+        dbuf.clear()?;
+        dbuf.write(&format!("{}", value), None, None);
+        dbuf.flush()?;
         dbuf.modify(Modifier::SetBackgroundColor(75, 50, 25));
         dbuf.modify(Modifier::SetForegroundColor(0, 0, 0));
         dbuf.modify(Modifier::SetFGLightness(0.2));
