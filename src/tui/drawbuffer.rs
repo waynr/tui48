@@ -23,18 +23,6 @@ pub(crate) trait DrawBufferOwner {
         self.lock().fill(c)
     }
 
-    fn write_left(&mut self, s: &str) -> Result<()> {
-        self.lock().write_left(s)
-    }
-
-    fn write_right(&mut self, s: &str) -> Result<()> {
-        self.lock().write_right(s)
-    }
-
-    fn write_center(&mut self, s: &str) -> Result<()> {
-        self.lock().write_center(s)
-    }
-
     fn translate(&self, dir: Direction) -> Result<()> {
         self.lock().translate(dir)
     }
@@ -70,59 +58,6 @@ impl std::fmt::Display for DrawBufferInner {
 }
 
 impl DrawBufferInner {
-    fn write_left(&mut self, s: &str) -> Result<()> {
-        let y = self.rectangle.height() / 2;
-        let x = if self.border { 1 } else { 0 };
-        for (offset, c) in s.chars().enumerate() {
-            if offset > self.rectangle.width() + x {
-                // can't write more than width of buffer
-                break;
-            }
-            self.get_tuxel_mut(Position::Coordinates(offset + x, y))?
-                .set_content(c);
-        }
-        Ok(())
-    }
-
-    fn write_right(&mut self, s: &str) -> Result<()> {
-        let y = self.rectangle.height() / 2;
-        let x = if self.border {
-            self.rectangle.width() - 2
-        } else {
-            self.rectangle.width() - 1
-        };
-        for (offset, c) in s.chars().rev().enumerate() {
-            if offset > x + 1 {
-                // can't write more than width of buffer
-                break;
-            }
-            self.get_tuxel_mut(Position::Coordinates(x - offset, y))?
-                .set_content(c);
-        }
-        Ok(())
-    }
-
-    fn write_center(&mut self, s: &str) -> Result<()> {
-        let y_offset = self.rectangle.height() / 2;
-        let width = self.rectangle.width();
-        let available_width = if self.border { width - 2 } else { width };
-        let border_offset = if self.border { 1 } else { 0 };
-        let x_offset = if s.len() >= available_width {
-            border_offset
-        } else {
-            border_offset + ((available_width as f32 - s.len() as f32) / 2.0).ceil() as usize
-        };
-        for (idx, c) in s
-            .chars()
-            .enumerate()
-            .take_while(|(idx, _)| *idx < available_width)
-        {
-            self.get_tuxel_mut(Position::Coordinates(idx + x_offset, y_offset))?
-                .set_content(c);
-        }
-        Ok(())
-    }
-
     #[inline(always)]
     pub(crate) fn get_tuxel_mut(&mut self, pos: Position) -> Result<&mut Tuxel> {
         let (x, y) = self.rectangle.relative_idx(&pos);
