@@ -10,7 +10,8 @@ use crate::engine::round::{AnimationHint, Hint};
 
 use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
-use crate::tui::drawbuffer::{DrawBufferOwner, DrawBuffer};
+use crate::tui::textbuffer::{FormatOptions, HAlignment, VAlignment, TextBuffer};
+use crate::tui::drawbuffer::{DrawBuffer, DrawBufferOwner};
 use crate::tui::error::InnerError as TuiError;
 use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
@@ -95,7 +96,7 @@ impl Tui48Board {
                 let value = round.get(&BoardIdx(x, y));
                 if value > 0 {
                     let r = Self::tile_rectangle(x, y, TILE_LAYER_IDX);
-                    let mut card_buffer = canvas.get_draw_buffer(r)?;
+                    let mut card_buffer = canvas.get_text_buffer(r)?;
                     Tui48Board::draw_tile(&mut card_buffer, value)?;
                     opt = Slot::Static(Tile::new(value, BoardIdx(x, y), card_buffer));
                 }
@@ -177,13 +178,18 @@ impl Tui48Board {
         Rectangle(idx, bounds)
     }
 
-    fn draw_tile(dbuf: &mut DrawBuffer, value: u16) -> Result<()> {
+    fn draw_tile(dbuf: &mut TextBuffer, value: u16) -> Result<()> {
         let colors = colors_from_value(value);
         dbuf.modify(colors.0);
         dbuf.modify(colors.1);
         dbuf.draw_border()?;
-        dbuf.fill(' ')?;
-        dbuf.write_center(&format!("{}", value))?;
+        dbuf.clear()?;
+        dbuf.format(FormatOptions{
+            halign: HAlignment::Center,
+            valign: VAlignment::Middle,
+        });
+        dbuf.write(&format!("{}", value), None, None);
+        dbuf.flush()?;
         Ok(())
     }
 
@@ -256,8 +262,8 @@ impl Tui48Board {
                 r
             }
         };
-        log::trace!("getting new drawbuffer for rectangle {}", db_rectangle);
-        let buf = self.canvas.get_draw_buffer(db_rectangle)?;
+        log::trace!("getting new textbuffer for rectangle {}", db_rectangle);
+        let buf = self.canvas.get_text_buffer(db_rectangle)?;
         let mut t = Tile::new(value, to_idx.clone(), buf);
         t.draw()?;
 
@@ -648,7 +654,7 @@ impl Slot {
 struct Tile {
     value: u16,
     idx: BoardIdx,
-    buf: DrawBuffer,
+    buf: TextBuffer,
 }
 
 impl std::fmt::Display for Tile {
@@ -664,7 +670,7 @@ impl std::fmt::Display for Tile {
 }
 
 impl Tile {
-    fn new(value: u16, idx: BoardIdx, buf: DrawBuffer) -> Self {
+    fn new(value: u16, idx: BoardIdx, buf: TextBuffer) -> Self {
         Self { value, idx, buf }
     }
 
@@ -725,7 +731,7 @@ impl SlidingTile {
             && self.inner.buf.rectangle().0.y() == self.to_rectangle.0.y()
         {
             // final frame
-            // don't move the drawbuffer to the tile layer, leave that for
+            // don't move the textbuffer to the tile layer, leave that for
             // Tui48Board.teardown_animation
             if let Some(v) = self.new_value {
                 self.inner.value = v;
@@ -957,7 +963,7 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         if let Some(tui_board) = &self.tui_board {
             let board_rectangle = tui_board.board.rectangle();
             let message_rectangle = board_rectangle.shrink_by(5, 8);
-            let mut buf = self.canvas.get_draw_buffer(message_rectangle)?;
+            let mut buf = self.canvas.get_text_buffer(message_rectangle)?;
             buf.write_left("game over! press 'q' to quit or 'n' to start new game")?;
             self.renderer.render(&self.canvas)?;
             match self.event_source.next_event()? {

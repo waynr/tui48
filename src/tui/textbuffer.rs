@@ -29,8 +29,8 @@ pub(crate) enum VAlignment {
 
 #[derive(Clone, Default, PartialEq)]
 pub(crate) struct FormatOptions {
-    halign: HAlignment,
-    valign: VAlignment,
+    pub halign: HAlignment,
+    pub valign: VAlignment,
 }
 
 pub(crate) struct CharBuf {
@@ -98,6 +98,12 @@ impl TextBuffer {
             return;
         }
         self.format = format
+    }
+
+    pub fn clear(&mut self) -> Result<()> {
+        self.bufs = Vec::new();
+        self.fill(' ')?;
+        Ok(())
     }
 
     pub fn write(&mut self, s: &str, fgcolor: Option<Rgb>, bgcolor: Option<Rgb>) {
