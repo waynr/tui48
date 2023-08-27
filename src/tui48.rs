@@ -795,8 +795,12 @@ pub(crate) fn init() -> Result<()> {
         // already set, no need to do anything else
         return Ok(());
     }
-    let bg_hue = 28.0;
-    let fg_hue = bg_hue + 180.0;
+    let fg_hue = 28.0 + 180.0;
+    let incr = |inc: u8, num: f32, div: u8| -> f32 { inc as f32 * num / div as f32 };
+    let bg_hue = |i: u8| -> f32 { incr(i, 360.0, MAX_TILE_EXPONENT) };
+    let bg_chroma = |i: u8| -> f32 { 30.0 + incr(i, 60.0, i) };
+    let fg_chroma = |i: u8| -> f32 { 90.0 - incr(i, 40.0, MAX_TILE_EXPONENT/2) };
+
     let defaults = Colors {
         card_colors: HashMap::from_iter(
             (0..MAX_TILE_EXPONENT)
@@ -804,8 +808,8 @@ pub(crate) fn init() -> Result<()> {
                 .map(|i| {
                     (
                         i,
-                        Lch::new(80.0, 90.0 - (40.0 * ((i % 2) as f32)), i as f32 * 360.0 / MAX_TILE_EXPONENT as f32),
-                        Lch::new(20.0, 90.0 - (40.0 * (((i + 1) % 2) as f32)), fg_hue),
+                        Lch::new(80.0, bg_chroma(i), bg_hue(i)),
+                        Lch::new(20.0, fg_chroma(i), fg_hue),
                     )
                 })
                 .map(|(k, bg_hsv, fg_hsv)| {
