@@ -788,6 +788,7 @@ struct Colors {
 }
 
 static DEFAULT_COLORS: OnceLock<Colors> = OnceLock::new();
+static MAX_TILE_EXPONENT: u8 = 17;
 
 pub(crate) fn init() -> Result<()> {
     if let Some(_) = DEFAULT_COLORS.get() {
@@ -798,13 +799,13 @@ pub(crate) fn init() -> Result<()> {
     let fg_hue = bg_hue + 180.0;
     let defaults = Colors {
         card_colors: HashMap::from_iter(
-            (0..11)
+            (0..MAX_TILE_EXPONENT)
                 .into_iter()
                 .map(|i| {
                     (
                         i,
-                        Lch::new(80.0, 90.0, i as f32 * 360.0 / 10.0),
-                        Lch::new(20.0, 50.0, fg_hue),
+                        Lch::new(80.0, 90.0 - (40.0 * ((i % 2) as f32)), i as f32 * 360.0 / MAX_TILE_EXPONENT as f32),
+                        Lch::new(20.0, 90.0 - (40.0 * (((i + 1) % 2) as f32)), fg_hue),
                     )
                 })
                 .map(|(k, bg_hsv, fg_hsv)| {
