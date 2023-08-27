@@ -160,7 +160,7 @@ impl Tui48Board {
         Ok(())
     }
 
-    fn draw_score(dbuf: &mut TextBuffer, value: u16) -> Result<()> {
+    fn draw_score(dbuf: &mut TextBuffer, value: u32) -> Result<()> {
         dbuf.draw_border()?;
         dbuf.clear()?;
         dbuf.write(&format!("{}", value), None, None);

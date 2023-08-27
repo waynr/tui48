@@ -89,7 +89,7 @@ impl AnimationHint {
 
 pub(crate) type Card = u16;
 
-pub(crate) type Score = u16;
+pub(crate) type Score = u32;
 
 const NEW_CARD_CHOICES: [u16; 2] = [2, 4];
 const NEW_CARD_WEIGHTS: [u8; 2] = [9, 1];
@@ -170,7 +170,7 @@ impl Round {
                 // do so and increment the score by the value of the eliminated element
                 if pivot == cmp {
                     let new_value = pivot + cmp;
-                    self.score += cmp;
+                    self.score += cmp as u32;
                     self.set(pivot_idx, pivot + cmp);
                     self.set(cmp_idx, 0);
                     hint.set(cmp_idx, Hint::NewValueToIdx(new_value, pivot_idx.clone()));
