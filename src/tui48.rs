@@ -10,12 +10,12 @@ use crate::engine::round::{AnimationHint, Hint};
 
 use super::error::{Error, Result};
 use crate::tui::canvas::{Canvas, Modifier};
-use crate::tui::textbuffer::{FormatOptions, HAlignment, VAlignment, TextBuffer};
 use crate::tui::drawbuffer::{DrawBuffer, DrawBufferOwner};
 use crate::tui::error::InnerError as TuiError;
 use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
+use crate::tui::textbuffer::{FormatOptions, HAlignment, TextBuffer, VAlignment};
 
 /// TUI representation of a 2048 game board.
 struct Tui48Board {
@@ -151,7 +151,7 @@ impl Tui48Board {
         dbuf.modify(colors.1);
         dbuf.draw_border()?;
         dbuf.clear()?;
-        dbuf.format(FormatOptions{
+        dbuf.format(FormatOptions {
             halign: HAlignment::Center,
             valign: VAlignment::Middle,
         });
@@ -938,7 +938,11 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
             let message_rectangle = board_rectangle.shrink_by(5, 8);
             let mut buf = self.canvas.get_text_buffer(message_rectangle)?;
             buf.clear()?;
-            buf.write("game over! press 'q' to quit or 'n' to start new game", None, None);
+            buf.write(
+                "game over! press 'q' to quit or 'n' to start new game",
+                None,
+                None,
+            );
             buf.flush()?;
             self.renderer.render(&self.canvas)?;
             match self.event_source.next_event()? {
@@ -966,11 +970,15 @@ impl<R: Renderer, E: EventSource> Tui48<R, E> {
         self.renderer.clear(&self.canvas)?;
         loop {
             let (c_width, c_height) = self.canvas.dimensions();
-            let canvas_rectangle = Rectangle(Idx(0,0,0), Bounds2D(c_width, c_height));
+            let canvas_rectangle = Rectangle(Idx(0, 0, 0), Bounds2D(c_width, c_height));
             let message_rectangle = canvas_rectangle.shrink_by(2, 2);
             let mut buf = self.canvas.get_text_buffer(message_rectangle)?;
             buf.clear()?;
-            buf.write("the terminal is too small, please make it bigger!", None, None);
+            buf.write(
+                "the terminal is too small, please make it bigger!",
+                None,
+                None,
+            );
             buf.flush()?;
             self.renderer.render(&self.canvas)?;
             match self.event_source.next_event()? {
