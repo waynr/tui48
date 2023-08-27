@@ -17,40 +17,7 @@ use crate::tui::events::{Event, EventSource, UserInput};
 use crate::tui::geometry::{Bounds2D, Direction, Idx, Rectangle};
 use crate::tui::renderer::Renderer;
 
-/// Generates a 2048 TUI layout with legible numbers.
-///
-///  37
-///  ╔══════════════════════════════════╗
-///  ║                                  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║                                  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║                                  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║                                  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║  xxxxxx  xxxxxx  xxxxxx  xxxxxx  ║
-///  ║                                  ║
-///  ╚══════════════════════════════════╝
-///  65
-///  6                                 42
-///
-///
+/// TUI representation of a 2048 game board.
 struct Tui48Board {
     canvas: Canvas,
     board: DrawBuffer,
