@@ -170,7 +170,7 @@ impl Round {
                 // do so and increment the score by the value of the eliminated element
                 if pivot == cmp {
                     let new_value = pivot + cmp;
-                    self.score += cmp as u32;
+                    self.score += new_value as u32;
                     self.set(pivot_idx, pivot + cmp);
                     self.set(cmp_idx, 0);
                     hint.set(cmp_idx, Hint::NewValueToIdx(new_value, pivot_idx.clone()));
@@ -445,22 +445,22 @@ mod test {
     #[case::all1s(
         Direction::Left,
         round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
-        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
     )]
     #[case::combine2s_shift_remaining(
         Direction::Left,
         round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
     )]
     #[case::combine2s_shift_remaining(
         Direction::Left,
         round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
     )]
     #[case::combine2s_ignore_4(
         Direction::Left,
         round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
-        round([[4, 4, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+        round([[4, 4, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::noop_no_compatible_combinations(
         Direction::Left,
@@ -470,17 +470,17 @@ mod test {
     #[case::all1s_right(
         Direction::Right,
         round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
-        round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
+        round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
     )]
     #[case::combine2s_shift_remaining_right(
         Direction::Right,
         round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[2, 0, 2, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[2, 0, 2, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
     )]
     #[case::combine2s_ignore_4_right(
         Direction::Right,
         round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
-        round([[2, 0, 4, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+        round([[2, 0, 4, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::noop_no_compatible_combinations_right(
         Direction::Right,
