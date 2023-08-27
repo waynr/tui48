@@ -27,8 +27,8 @@ impl Idx {
 #[derive(Clone, PartialEq)]
 pub(crate) enum Hint {
     ToIdx(Idx),
-    NewValueToIdx(u16, Idx),
-    NewTile(u16, Direction),
+    NewValueToIdx(u8, Idx),
+    NewTile(u8, Direction),
 }
 
 impl std::fmt::Display for Hint {
@@ -87,11 +87,11 @@ impl AnimationHint {
     }
 }
 
-pub(crate) type Card = u16;
+pub(crate) type Card = u8;
 
 pub(crate) type Score = u32;
 
-const NEW_CARD_CHOICES: [u16; 2] = [2, 4];
+const NEW_CARD_CHOICES: [u8; 2] = [1, 2];
 const NEW_CARD_WEIGHTS: [u8; 2] = [9, 1];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -129,8 +129,8 @@ impl Round {
             }
             break;
         }
-        r.slots[ydx1][xdx1] = 2;
-        r.slots[ydx2][xdx2] = 2;
+        r.slots[ydx1][xdx1] = 1;
+        r.slots[ydx2][xdx2] = 1;
         r
     }
 
@@ -167,11 +167,12 @@ impl Round {
                     continue;
                 }
                 // if the pivot element and the cmp element are equal then they must be combined;
-                // do so and increment the score by the value of the eliminated element
+                // do so and increment the score by 1 since we are tracking not the actual card
+                // value, but its exponent
                 if pivot == cmp {
-                    let new_value = pivot + cmp;
-                    self.score += new_value as u32;
-                    self.set(pivot_idx, pivot + cmp);
+                    let new_value = pivot + 1;
+                    self.score += 2_u32.pow(new_value as u32);
+                    self.set(pivot_idx, pivot + 1);
                     self.set(cmp_idx, 0);
                     hint.set(cmp_idx, Hint::NewValueToIdx(new_value, pivot_idx.clone()));
                 }
@@ -201,9 +202,10 @@ impl Round {
     }
 
     pub(crate) fn is_game_over(&self, direction_hint: &Direction) -> bool {
-        self.indices(direction_hint).find(|v| self.get(&v) == 0).is_none()
+        self.indices(direction_hint)
+            .find(|v| self.get(&v) == 0)
+            .is_none()
     }
-
 }
 
 // private methods
@@ -226,7 +228,7 @@ impl Round {
     }
 
     #[cfg(test)]
-    pub(crate) fn set_value(&mut self, idx: &Idx, value: u16) {
+    pub(crate) fn set_value(&mut self, idx: &Idx, value: u8) {
         let rf = self.get_mut(idx);
         *rf = value;
     }
@@ -377,55 +379,55 @@ mod test {
     #[rstest]
     #[case::identity_left(Direction::Left,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[1, 0, 0, 2], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
+           [[1, 0, 0, 1], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::identity_right(Direction::Right,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[2, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
+           [[1, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
     )]
     #[case::identity_up(Direction::Up,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [2, 0, 0, 0]],
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::identity_down(Direction::Down,
            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
-           [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
+           [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
     )]
     #[case::flipped_identity_left(Direction::Left,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[1, 0, 0, 2], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
+           [[1, 0, 0, 1], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::flipped_identity_right(Direction::Right,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[2, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
+           [[1, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
     )]
     #[case::flipped_identity_up(Direction::Up,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [2, 0, 0, 0]],
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::flipped_identity_down(Direction::Down,
            [[0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
-           [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
+           [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
     )]
     #[case::all_left(Direction::Left,
            [[0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
-           [[1, 0, 0, 2], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
+           [[1, 0, 0, 1], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::all_right(Direction::Right,
            [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]],
-           [[2, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
+           [[1, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1], [0, 0, 0, 1]],
     )]
     #[case::all_down(Direction::Down,
            [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-           [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
+           [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
     )]
     #[case::all_up(Direction::Up,
            [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1]],
-           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [2, 0, 0, 0]],
+           [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]],
     )]
     #[case::pivot_is_zero_with_multiple_shift_elements(Direction::Left,
            [[0, 1, 2, 3], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-           [[1, 2, 3, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+           [[1, 2, 3, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
     )]
     fn shift(
         #[case] direction: Direction,
@@ -445,42 +447,42 @@ mod test {
     #[case::all1s(
         Direction::Left,
         round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
-        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[2, 2, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::combine2s_shift_remaining(
         Direction::Left,
-        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[3, 2, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::combine2s_shift_remaining(
         Direction::Left,
-        round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+        round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[3, 2, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::combine2s_ignore_4(
         Direction::Left,
-        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
-        round([[4, 4, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[4, 3, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::noop_no_compatible_combinations(
         Direction::Left,
-        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
-        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[2, 4, 8, 16], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
     )]
     #[case::all1s_right(
         Direction::Right,
         round([[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
-        round([[2, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
+        round([[1, 0, 2, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::combine2s_shift_remaining_right(
         Direction::Right,
-        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 2),
-        round([[2, 0, 2, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 6),
+        round([[2, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[1, 0, 2, 3], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::combine2s_ignore_4_right(
         Direction::Right,
-        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 4),
-        round([[2, 0, 4, 4], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
+        round([[4, 2, 0, 2], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 0),
+        round([[1, 0, 4, 3], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 8),
     )]
     #[case::noop_no_compatible_combinations_right(
         Direction::Right,
