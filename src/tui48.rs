@@ -145,7 +145,7 @@ impl Tui48Board {
         Rectangle(idx, bounds)
     }
 
-    fn draw_tile(dbuf: &mut TextBuffer, value: u16) -> Result<()> {
+    fn draw_tile(dbuf: &mut TextBuffer, value: u8) -> Result<()> {
         let colors = colors_from_value(value);
         dbuf.modify(colors.0);
         dbuf.modify(colors.1);
@@ -155,7 +155,7 @@ impl Tui48Board {
             halign: HAlignment::Center,
             valign: VAlignment::Middle,
         });
-        dbuf.write(&format!("{}", value), None, None);
+        dbuf.write(&format!("{}", 2u32.pow(value as u32)), None, None);
         dbuf.flush()?;
         Ok(())
     }
@@ -205,7 +205,7 @@ impl Tui48Board {
     fn new_sliding_tile(
         &mut self,
         to_idx: &BoardIdx,
-        value: u16,
+        value: u8,
         direction: &Direction,
     ) -> Result<SlidingTile> {
         let db_rectangle = match direction {
@@ -515,7 +515,7 @@ impl Slot {
         std::mem::take(self)
     }
 
-    fn to_sliding(this: Self, to_idx: BoardIdx, new_value: Option<u16>) -> Result<Self> {
+    fn to_sliding(this: Self, to_idx: BoardIdx, new_value: Option<u8>) -> Result<Self> {
         // only allow static tiles to be converted to sliding
         let mut t = match this {
             Self::Static(t) => t,
@@ -578,7 +578,7 @@ impl Slot {
 }
 
 impl Slot {
-    fn value(&self) -> Option<u16> {
+    fn value(&self) -> Option<u8> {
         match self {
             Self::Empty => None,
             Self::Static(t) => Some(t.value()),
@@ -586,7 +586,7 @@ impl Slot {
         }
     }
 
-    fn new_value(&self) -> Option<u16> {
+    fn new_value(&self) -> Option<u8> {
         match self {
             Self::Empty => None,
             Self::Static(_) => None,
@@ -620,7 +620,7 @@ impl Slot {
 }
 
 struct Tile {
-    value: u16,
+    value: u8,
     idx: BoardIdx,
     buf: TextBuffer,
 }
@@ -638,7 +638,7 @@ impl std::fmt::Display for Tile {
 }
 
 impl Tile {
-    fn new(value: u16, idx: BoardIdx, buf: TextBuffer) -> Self {
+    fn new(value: u8, idx: BoardIdx, buf: TextBuffer) -> Self {
         Self { value, idx, buf }
     }
 
@@ -646,7 +646,7 @@ impl Tile {
         Tui48Board::draw_tile(&mut self.buf, self.value)
     }
 
-    fn value(&self) -> u16 {
+    fn value(&self) -> u8 {
         self.value
     }
 
@@ -663,7 +663,7 @@ struct SlidingTile {
     inner: Tile,
     to_rectangle: Rectangle,
     is_animating: bool,
-    new_value: Option<u16>,
+    new_value: Option<u8>,
 }
 
 impl std::fmt::Display for SlidingTile {
@@ -677,7 +677,7 @@ impl std::fmt::Display for SlidingTile {
 }
 
 impl SlidingTile {
-    fn new(inner: Tile, to_rectangle: Rectangle, new_value: Option<u16>) -> Self {
+    fn new(inner: Tile, to_rectangle: Rectangle, new_value: Option<u8>) -> Self {
         Self {
             inner,
             to_rectangle,
@@ -761,11 +761,11 @@ impl SlidingTile {
 }
 
 impl SlidingTile {
-    fn value(&self) -> u16 {
+    fn value(&self) -> u8 {
         self.inner.value
     }
 
-    fn new_value(&self) -> Option<u16> {
+    fn new_value(&self) -> Option<u8> {
         self.new_value
     }
 
@@ -784,7 +784,7 @@ impl SlidingTile {
 
 struct Colors {
     // TODO: change this from canvas::Modifer to colors::Rgb
-    card_colors: HashMap<u16, (Modifier, Modifier)>,
+    card_colors: HashMap<u8, (Modifier, Modifier)>,
 }
 
 static DEFAULT_COLORS: OnceLock<Colors> = OnceLock::new();
@@ -802,7 +802,7 @@ pub(crate) fn init() -> Result<()> {
                 .into_iter()
                 .map(|i| {
                     (
-                        2u16.pow(i),
+                        i,
                         Lch::new(80.0, 90.0, i as f32 * 360.0 / 10.0),
                         Lch::new(20.0, 50.0, fg_hue),
                     )
@@ -831,7 +831,7 @@ pub(crate) fn init() -> Result<()> {
 }
 
 #[inline(always)]
-fn colors_from_value(value: u16) -> (Modifier, Modifier) {
+fn colors_from_value(value: u8) -> (Modifier, Modifier) {
     let (background, foreground) = DEFAULT_COLORS
         .get()
         .expect("DEFAULT_COLORS should always be initialized by this point")
@@ -1065,7 +1065,7 @@ mod test {
     use super::*;
     use crate::engine::round::Round;
 
-    fn generate_round_from(idxs: HashMap<BoardIdx, u16>) -> Round {
+    fn generate_round_from(idxs: HashMap<BoardIdx, u8>) -> Round {
         let mut round = Round::default();
         for x in 0..3 {
             for y in 0..3 {
@@ -1081,7 +1081,7 @@ mod test {
     fn setup(
         width: usize,
         height: usize,
-        idxs: HashMap<BoardIdx, u16>,
+        idxs: HashMap<BoardIdx, u8>,
     ) -> Result<(Board, Canvas, Tui48Board)> {
         let mut canvas = Canvas::new(width, height);
         let rng = rand::rngs::SmallRng::seed_from_u64(10);
@@ -1135,9 +1135,9 @@ mod test {
         assert_eq!(*idx1, BoardIdx(0, 1));
         assert!(matches!(hint1, Hint::ToIdx(BoardIdx(0, 3))));
         assert_eq!(*idx2, BoardIdx(0, 0));
-        assert!(matches!(hint2, Hint::NewValueToIdx(4, BoardIdx(0, 3))));
+        assert!(matches!(hint2, Hint::NewValueToIdx(3, BoardIdx(0, 3))));
         assert_eq!(*idx3, BoardIdx(2, 0));
-        assert!(matches!(hint3, Hint::NewTile(2, Direction::Down)));
+        assert!(matches!(hint3, Hint::NewTile(1, Direction::Down)));
 
         verify_occupied_layers(&canvas, vec![2, 4], vec![0, 1, 3, 5, 6, 7]);
         tui_board.setup_animation(&hint)?;
