@@ -803,7 +803,7 @@ pub(crate) fn init() -> Result<()> {
 
     let defaults = Colors {
         card_colors: HashMap::from_iter(
-            (0..MAX_TILE_EXPONENT)
+            (1..MAX_TILE_EXPONENT)
                 .into_iter()
                 .map(|i| {
                     (
